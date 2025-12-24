@@ -1,0 +1,36 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-md-8">
+        <div class="card shadow-sm">
+            <div class="card-body">
+                <h3 class="card-title mb-3">Telaffuz Pratiği - LoroLeng</h3>
+                <p class="text-muted">Kullanıcı: {{ username }}</p>
+
+                <p>
+                    Hedef kelime:
+                    <span class="badge bg-warning text-dark">{{ target_word }}</span>
+                </p>
+
+                <p class="text-muted">
+                    Demo aşaması: Şimdilik gerçek ses yükleme yok, sadece akışı göstermek için skor üretiyoruz.
+                    
+                </p>
+
+                <form method="post">
+                    <button type="submit" class="btn btn-warning">Telaffuzumu Değerlendir (Demo)</button>
+                    <a href="{{ url_for('dashboard') }}" class="btn btn-link">Geri dön</a>
+                </form>
+
+                {% if score %}
+                    <div class="alert alert-success mt-3">
+                        Tahmini telaffuz skorun: <strong>%{{ score }}</strong><br>
+                        <small class="text-muted">{{ info }}</small>
+                    </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

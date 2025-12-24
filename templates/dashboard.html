@@ -1,0 +1,13 @@
+{% extends "base.html" %}
+
+{% block content %}
+<h2>Merhaba, {{ username }} 👋</h2>
+<p class="text-muted">LoroLeng ile kelime, cümle ve telaffuz pratiği yap.</p>
+
+<ul>
+    <li><a href="{{ url_for('practice_word') }}">Kelime Çalış (şimdilik basit)</a></li>
+    <li><a href="{{ url_for('practice_sentence') }}">Cümle & Grammar (demo)</a></li>
+    <li><a href="{{ url_for('pronunciation') }}">Telaffuz Pratiği (demo)</a></li>
+</ul>
+{% endblock %}
+
