@@ -1,5 +1,6 @@
-from speech_utils import listen_and_recognize
+from speech_stt import listen_and_recognize
 from ai_utils import pronunciation_feedback
+from speech_utils import TextToSpeech
 
 def main():
     expected_word = "apple"
@@ -10,7 +11,12 @@ def main():
     result = pronunciation_feedback(expected_word, recognized)
 
     print("🎯 Puan:", result["score"])
-    print("📝 Geri Bildirim:", result["feedback_tr"])
+    # print("📝 Geri Bildirim:", result["feedback_tr"])
+    
+    tts = TextToSpeech()
+    tts.speak("eueueueueu çoook içten gonuuşşşşttuuuu")
+    
+
 
 if __name__ == "__main__":
     main()
