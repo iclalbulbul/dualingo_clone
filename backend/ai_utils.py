@@ -177,3 +177,41 @@ def generate_custom_lesson(topic: str, level: str = "A1-A2") -> str:
 
     return _llm_chat(prompt, system="You are a friendly English teacher.")
 
+def pronunciation_feedback(expected: str, recognized: str) -> dict:
+    """
+    Kullanıcının telaffuzunu değerlendirir.
+    """
+    prompt = f"""
+    Expected word: "{expected}"
+    Recognized speech: "{recognized}"
+
+    Evaluate pronunciation quality from 0 to 100.
+    Then explain shortly in Turkish:
+    - What was correct
+    - What was wrong
+    - How to improve
+
+    Return JSON format:
+    {{
+      "score": number,
+      "feedback_tr": string
+    }}
+    """
+
+    result = _llm_chat(prompt, system="You are an English pronunciation coach.")
+
+    # API yoksa fallback
+    if result.startswith("⚠️"):
+        return {
+            "score": 50,
+            "feedback_tr": "Telaffuz kısmen doğru ancak daha net konuşmalısın."
+        }
+
+    import json
+    try:
+        return json.loads(result)
+    except:
+        return {
+            "score": 60,
+            "feedback_tr": "Telaffuz değerlendirildi ancak ayrıntı alınamadı."
+        }

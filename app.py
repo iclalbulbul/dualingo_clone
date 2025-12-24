@@ -1,4 +1,5 @@
 from flask import Flask, render_template, request, redirect, url_for, session
+from backend.rules import analyze_sentence
 
 app = Flask(__name__)
 app.secret_key = "cok_gizli_anahtar"
@@ -81,24 +82,28 @@ def practice_sentence():
     
     feedback = None
     user_sentence = None
+    analysis_result = None
 
     if request.method =="POST":
         user_sentence = request.form.get("sentence", "").strip()
 
         if user_sentence:
-            #llmi henüz dahil etmedik edince eklicez şimdilik dummy feedback
-
-            feedback = (
-                "bu sadece bir geri bildirim"
-                "normalde buraya llm ile cümle analizi gelecek"
-            )
+            # Grammar rules engine ile cümleyi analiz et
+            analysis_result = analyze_sentence(user_sentence)
+            
+            feedback = {
+                "is_valid": analysis_result["is_valid"],
+                "score": analysis_result["score"],
+                "errors": analysis_result["errors"],
+                "suggestions": analysis_result["suggestions"]
+            }
             
     return render_template(
         "practice_sentence.html",
         username = username,
         user_sentence = user_sentence,
-        feedback=feedback
-
+        feedback=feedback,
+        analysis_result=analysis_result
     )
 
 

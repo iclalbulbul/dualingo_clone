@@ -1,13 +1,22 @@
-from speech_utils import speak_text
+from speech_utils import TextToSpeech
 
 def main():
-    word = "apple"
-    speak_text(f"The correct pronunciation of the word is {word}")
-    speak_text("Hello")
-    speak_text("How are you?")
+    print("TTS testi başlıyor...")
 
-if __name__ == "__main__":
-    main()
+    tts = TextToSpeech()
+
+    word = "apple"
+    kelimeler = [
+        f"The correct pronunciation of the word is {word}",
+        "Hello",
+        "How are you?"
+    ]
+    for i in kelimeler:
+        tts.speak(text=i)
+
+    # 🔥 BÜTÜN METİNLERİ OKUTAN KISIM
+
+    print("TTS testi bitti.")
 
 if __name__ == "__main__":
     main()
