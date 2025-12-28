@@ -5,21 +5,173 @@
     <title>LoroLeng - AI Language Tutor</title>
     <meta name="viewport" content="width=device-width, initial-scale=1">
 
-    <!-- Bootstrap (hazır tasarım için) -->
+    <!-- Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800&display=swap" rel="stylesheet">
+    
+    <!-- Bootstrap & Icons -->
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css" rel="stylesheet">
     <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
 </head>
-<body class="bg-light">
-<nav class="navbar navbar-expand-lg navbar-dark bg-dark mb-4">
+<body>
+
+<!-- Modern Navbar -->
+<nav class="main-navbar">
     <div class="container">
-        <a class="navbar-brand" href="{{ url_for('dashboard') }}">LoroLeng</a>
+        <div class="navbar-inner">
+            <!-- Logo -->
+            <a class="navbar-logo" href="{{ url_for('dashboard') }}">
+                <span class="logo-icon">🦜</span>
+                <span class="logo-text">LoroLeng</span>
+            </a>
+            
+            {% if session.get('username') %}
+            <!-- Ana Menü -->
+            <ul class="nav-menu">
+                <li class="nav-menu-item">
+                    <a href="{{ url_for('dashboard') }}" class="nav-menu-link">
+                        <i class="bi bi-house-door"></i>
+                        <span>Ana Sayfa</span>
+                    </a>
+                </li>
+                <li class="nav-menu-item">
+                    <a href="{{ url_for('learn') }}" class="nav-menu-link learn-link">
+                        <i class="bi bi-mortarboard-fill"></i>
+                        <span>Öğren</span>
+                    </a>
+                </li>
+                <li class="nav-menu-item dropdown">
+                    <a href="#" class="nav-menu-link" data-bs-toggle="dropdown">
+                        <i class="bi bi-book"></i>
+                        <span>Pratik</span>
+                        <i class="bi bi-chevron-down"></i>
+                    </a>
+                    <ul class="dropdown-menu modern-dropdown">
+                        <li><a class="dropdown-item" href="{{ url_for('practice_word') }}">
+                            <i class="bi bi-translate text-primary"></i> Kelime Çalış
+                        </a></li>
+                        <li><a class="dropdown-item" href="{{ url_for('practice_sentence') }}">
+                            <i class="bi bi-chat-text text-success"></i> Cümle & Gramer
+                        </a></li>
+                        <li><a class="dropdown-item" href="{{ url_for('pronunciation') }}">
+                            <i class="bi bi-mic text-danger"></i> Telaffuz
+                        </a></li>
+                    </ul>
+                </li>
+                <li class="nav-menu-item">
+                    <a href="{{ url_for('leaderboard') }}" class="nav-menu-link">
+                        <i class="bi bi-trophy"></i>
+                        <span>Sıralama</span>
+                    </a>
+                </li>
+                <li class="nav-menu-item dropdown">
+                    <a href="#" class="nav-menu-link" data-bs-toggle="dropdown">
+                        <i class="bi bi-people"></i>
+                        <span>Sosyal</span>
+                        <i class="bi bi-chevron-down"></i>
+                    </a>
+                    <ul class="dropdown-menu modern-dropdown">
+                        <li><a class="dropdown-item" href="{{ url_for('friends') }}">
+                            <i class="bi bi-person-plus text-info"></i> Arkadaşlar
+                        </a></li>
+                        <li><a class="dropdown-item" href="{{ url_for('user_profile', user_id=session.get('user_id', 0)) }}">
+                            <i class="bi bi-person-circle text-secondary"></i> Profilim
+                        </a></li>
+                    </ul>
+                </li>
+            </ul>
+            
+            <!-- Sağ Menü -->
+            <div class="nav-actions">
+                <a href="{{ url_for('notifications') }}" class="nav-action-btn" title="Bildirimler">
+                    <i class="bi bi-bell"></i>
+                    <span class="notification-dot" id="notificationBadge" style="display: none;"></span>
+                </a>
+                <a href="{{ url_for('user_stats') }}" class="nav-action-btn" title="İstatistikler">
+                    <i class="bi bi-bar-chart"></i>
+                </a>
+                <a href="{{ url_for('goals') }}" class="nav-action-btn" title="Hedefler">
+                    <i class="bi bi-bullseye"></i>
+                </a>
+                
+                <!-- Kullanıcı -->
+                <div class="nav-user dropdown">
+                    <a href="#" class="nav-user-btn" data-bs-toggle="dropdown">
+                        <div class="nav-user-avatar">{{ session.get('username', 'U')[0]|upper }}</div>
+                        <span class="nav-user-name">{{ session.get('username') }}</span>
+                        <i class="bi bi-chevron-down"></i>
+                    </a>
+                    <ul class="dropdown-menu dropdown-menu-end modern-dropdown">
+                        <li><a class="dropdown-item" href="{{ url_for('user_profile', user_id=session.get('user_id', 0)) }}">
+                            <i class="bi bi-person"></i> Profilim
+                        </a></li>
+                        <li><a class="dropdown-item" href="{{ url_for('user_stats') }}">
+                            <i class="bi bi-graph-up"></i> İstatistiklerim
+                        </a></li>
+                        <li><a class="dropdown-item" href="{{ url_for('goals') }}">
+                            <i class="bi bi-flag"></i> Hedeflerim
+                        </a></li>
+                        <li><hr class="dropdown-divider"></li>
+                        <li><a class="dropdown-item text-danger" href="{{ url_for('logout') }}">
+                            <i class="bi bi-box-arrow-right"></i> Çıkış Yap
+                        </a></li>
+                    </ul>
+                </div>
+            </div>
+            
+            <!-- Mobile Toggle -->
+            <button class="mobile-toggle" type="button" data-bs-toggle="collapse" data-bs-target="#mobileNav">
+                <i class="bi bi-list"></i>
+            </button>
+            {% endif %}
+        </div>
+        
+        <!-- Mobile Menu -->
+        {% if session.get('username') %}
+        <div class="collapse mobile-nav" id="mobileNav">
+            <a href="{{ url_for('dashboard') }}" class="mobile-nav-link"><i class="bi bi-house-door"></i> Ana Sayfa</a>
+            <a href="{{ url_for('learn') }}" class="mobile-nav-link"><i class="bi bi-mortarboard-fill"></i> Öğren</a>
+            <a href="{{ url_for('practice_word') }}" class="mobile-nav-link"><i class="bi bi-translate"></i> Kelime Çalış</a>
+            <a href="{{ url_for('practice_sentence') }}" class="mobile-nav-link"><i class="bi bi-chat-text"></i> Cümle & Gramer</a>
+            <a href="{{ url_for('pronunciation') }}" class="mobile-nav-link"><i class="bi bi-mic"></i> Telaffuz</a>
+            <a href="{{ url_for('leaderboard') }}" class="mobile-nav-link"><i class="bi bi-trophy"></i> Sıralama</a>
+            <a href="{{ url_for('friends') }}" class="mobile-nav-link"><i class="bi bi-people"></i> Arkadaşlar</a>
+            <a href="{{ url_for('goals') }}" class="mobile-nav-link"><i class="bi bi-bullseye"></i> Hedefler</a>
+            <a href="{{ url_for('logout') }}" class="mobile-nav-link text-danger"><i class="bi bi-box-arrow-right"></i> Çıkış</a>
+        </div>
+        {% endif %}
     </div>
 </nav>
 
-<div class="container">
-    {% block content %}{% endblock %}
-</div>
+<main class="main-content">
+    <div class="container">
+        {% block content %}{% endblock %}
+    </div>
+</main>
 
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+
+{% if session.get('username') %}
+<script>
+// Bildirim sayısını güncelle
+function updateNotificationBadge() {
+    fetch('/api/unread-notifications')
+        .then(response => response.json())
+        .then(data => {
+            const badge = document.getElementById('notificationBadge');
+            if (data.count > 0) {
+                badge.style.display = 'block';
+            } else {
+                badge.style.display = 'none';
+            }
+        })
+        .catch(err => console.log('Bildirim hatası:', err));
+}
+
+document.addEventListener('DOMContentLoaded', updateNotificationBadge);
+setInterval(updateNotificationBadge, 30000);
+</script>
+{% endif %}
+
 </body>
 </html>

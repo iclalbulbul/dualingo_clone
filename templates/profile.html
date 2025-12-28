@@ -1,0 +1,151 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="container mt-5">
+    {% if not profile or not profile.username %}
+    <div class="alert alert-warning">
+        <h4>Profil bulunamadı</h4>
+        <p>Bu kullanıcı mevcut değil veya profil bilgileri yüklenemedi.</p>
+        <a href="{{ url_for('dashboard') }}" class="btn btn-primary">Dashboard'a Dön</a>
+    </div>
+    {% else %}
+    <div class="row">
+        <!-- Profil Başlığı -->
+        <div class="col-md-4">
+            <div class="card">
+                <div class="card-body text-center">
+                    <div style="font-size: 3em; margin-bottom: 10px;">👤</div>
+                    <h4>{{ profile.username or 'Bilinmeyen' }}</h4>
+                    <p class="text-muted">Level: <strong>{{ profile.level or 'A1' }}</strong></p>
+                    <p>Katılım: {{ profile.created_at or '-' }}</p>
+                    
+                    {% if not is_own_profile and profile.user_id %}
+                    <form method="post" action="{{ url_for('add_friend', friend_id=profile.user_id) }}">
+                        <button type="submit" class="btn btn-primary btn-block">👥 Arkadaş Ekle</button>
+                    </form>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+        
+        <!-- İstatistikler -->
+        <div class="col-md-8">
+            <!-- Sıralama ve Puan -->
+            <div class="card mb-3">
+                <div class="card-header bg-success text-white">
+                    <h5>🏆 Sıralama & Puan</h5>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-4">
+                            <h6>Toplam Puan</h6>
+                            <p class="display-4">{{ profile.score or 0 }}</p>
+                        </div>
+                        <div class="col-md-4">
+                            <h6>Sıra</h6>
+                            <p class="display-4">#{{ profile.rank.rank if profile.rank else '—' }}</p>
+                        </div>
+                        <div class="col-md-4">
+                            <h6>Madalya</h6>
+                            <p style="font-size: 2.5em;">{{ profile.rank.medal if profile.rank else '🌟' }}</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Genel İstatistikler -->
+            <div class="card mb-3">
+                <div class="card-header bg-primary text-white">
+                    <h5>📊 Genel İstatistikler</h5>
+                </div>
+                <div class="card-body">
+                    {% if profile.statistics %}
+                    <div class="row">
+                        <div class="col-md-6">
+                            <p><strong>Toplam Input:</strong> {{ profile.statistics.total_inputs or 0 }}</p>
+                            <p><strong>Doğru Cevaplar:</strong> {{ profile.statistics.correct_answers or 0 }}</p>
+                            <p><strong>Doğruluk:</strong> {{ "%.1f"|format(profile.statistics.accuracy_percent or 0) }}%</p>
+                        </div>
+                        <div class="col-md-6">
+                            <p><strong>Ortalama Skor:</strong> {{ "%.1f"|format(profile.statistics.average_score or 0) }}</p>
+                            <p><strong>Telaffuz Skor:</strong> {{ "%.1f"|format(profile.statistics.average_pronunciation_score or 0) }}</p>
+                            <p><strong>Arkadaş Sayısı:</strong> {{ profile.friends_count or 0 }}</p>
+                        </div>
+                    </div>
+                    {% else %}
+                    <p class="text-muted">Henüz istatistik bulunmuyor.</p>
+                    {% endif %}
+                </div>
+            </div>
+            
+            <!-- Zayıf Kelimeler -->
+            {% if profile.statistics and profile.statistics.weak_words %}
+            <div class="card">
+                <div class="card-header bg-warning">
+                    <h5>📚 En Zayıf Kelimeler</h5>
+                </div>
+                <div class="card-body">
+                    <ul class="list-group">
+                        {% for word in profile.statistics.weak_words %}
+                        <li class="list-group-item">
+                            <strong>{{ word.word }}</strong>
+                            <br>
+                            <small>{{ word.attempts }} deneme, Benzerlik: {{ "%.1f"|format(word.avg_similarity or 0) }}%</small>
+                        </li>
+                        {% endfor %}
+                    </ul>
+                </div>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+    
+    <!-- Son Aktiviteler -->
+    {% if profile.recent_activity %}
+    <div class="card mt-4">
+        <div class="card-header bg-info text-white">
+            <h5>📝 Son Aktiviteler</h5>
+        </div>
+        <div class="card-body">
+            <table class="table table-sm">
+                <thead>
+                    <tr>
+                        <th>Tür</th>
+                        <th>Giriş</th>
+                        <th>Yanıt</th>
+                        <th>Skor</th>
+                        <th>Tarih</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for activity in profile.recent_activity %}
+                    <tr>
+                        <td><small>{{ activity.type }}</small></td>
+                        <td><small>{{ activity.input[:20] if activity.input else '' }}</small></td>
+                        <td>
+                            <small>
+                                {% if activity.is_correct %}
+                                <span class="badge bg-success">✓</span>
+                                {% else %}
+                                <span class="badge bg-danger">✗</span>
+                                {% endif %}
+                            </small>
+                        </td>
+                        <td><small>{{ activity.score or '-' }}</small></td>
+                        <td><small>{{ activity.timestamp }}</small></td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+    {% endif %}
+    
+    <div class="mt-4">
+        <a href="{{ url_for('dashboard') }}" class="btn btn-secondary">← Dashboard</a>
+        <a href="{{ url_for('friends') }}" class="btn btn-outline-primary">👥 Arkadaşlar</a>
+        <a href="{{ url_for('leaderboard') }}" class="btn btn-primary">🏆 Sıralamalar</a>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}

@@ -1,0 +1,594 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="lesson-page" data-lesson-id="{{ lesson.id }}">
+    <!-- Üst Bar -->
+    <div class="lesson-header">
+        <a href="{{ url_for('learn') }}" class="back-btn">
+            <i class="bi bi-x-lg"></i>
+        </a>
+        <div class="lesson-progress-bar">
+            <div class="progress-fill" id="progressFill" style="width: 0%"></div>
+        </div>
+        <div class="lesson-hearts">
+            <i class="bi bi-heart-fill"></i>
+            <span id="heartsCount">5</span>
+        </div>
+    </div>
+
+    <!-- Ders Bilgisi -->
+    <div class="lesson-info-bar">
+        <span class="level-badge">{{ lesson.level }}</span>
+        <span class="unit-name">{{ lesson.unit_title }}</span>
+        <span class="lesson-name">{{ lesson.title }}</span>
+    </div>
+
+    <!-- Soru Alanı -->
+    <div class="question-container">
+        <div id="questionArea">
+            <!-- JavaScript ile doldurulacak -->
+        </div>
+    </div>
+
+    <!-- Cevap Alanı -->
+    <div class="answer-container" id="answerContainer">
+        <!-- Dinamik içerik -->
+    </div>
+
+    <!-- Alt Butonlar -->
+    <div class="lesson-footer">
+        <div id="feedbackArea" class="feedback-area" style="display: none;"></div>
+        <button id="checkBtn" class="btn-lesson btn-check" disabled>Kontrol Et</button>
+        <button id="continueBtn" class="btn-lesson btn-continue" style="display: none;">Devam Et</button>
+    </div>
+</div>
+
+<!-- Tamamlama Modal -->
+<div class="lesson-complete-modal" id="completeModal" style="display: none;">
+    <div class="modal-content">
+        <div class="modal-icon">🎉</div>
+        <h2>Ders Tamamlandı!</h2>
+        <div class="modal-stats">
+            <div class="stat">
+                <span class="stat-value" id="finalScore">0</span>
+                <span class="stat-label">Puan</span>
+            </div>
+            <div class="stat">
+                <span class="stat-value" id="earnedXp">+0</span>
+                <span class="stat-label">XP</span>
+            </div>
+        </div>
+        <a href="{{ url_for('learn') }}" class="btn-lesson btn-continue">Devam Et</a>
+    </div>
+</div>
+
+<style>
+/* ===== LESSON PAGE ===== */
+.lesson-page {
+    max-width: 600px;
+    margin: 0 auto;
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    padding: 0;
+    background: var(--light);
+}
+
+/* Header */
+.lesson-header {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    padding: 16px 20px;
+    background: var(--white);
+    border-bottom: 1px solid #e0e0e0;
+}
+
+.back-btn {
+    width: 40px;
+    height: 40px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--gray);
+    text-decoration: none;
+    border-radius: 50%;
+    transition: all 0.2s;
+}
+
+.back-btn:hover {
+    background: var(--light);
+    color: var(--dark);
+}
+
+.lesson-progress-bar {
+    flex: 1;
+    height: 16px;
+    background: #e0e0e0;
+    border-radius: 8px;
+    overflow: hidden;
+}
+
+.lesson-progress-bar .progress-fill {
+    height: 100%;
+    background: var(--primary);
+    border-radius: 8px;
+    transition: width 0.3s ease;
+}
+
+.lesson-hearts {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    color: #ff4b4b;
+    font-weight: 700;
+}
+
+/* Info Bar */
+.lesson-info-bar {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 12px 20px;
+    background: var(--white);
+    font-size: 14px;
+}
+
+.level-badge {
+    background: var(--primary);
+    color: white;
+    padding: 4px 10px;
+    border-radius: 12px;
+    font-weight: 700;
+    font-size: 12px;
+}
+
+.unit-name {
+    color: var(--gray);
+}
+
+.lesson-name {
+    font-weight: 600;
+    color: var(--dark);
+}
+
+/* Question Container */
+.question-container {
+    flex: 1;
+    padding: 32px 20px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+}
+
+#questionArea {
+    width: 100%;
+    text-align: center;
+}
+
+.question-type {
+    font-size: 14px;
+    color: var(--gray);
+    margin-bottom: 8px;
+}
+
+.question-text {
+    font-size: 28px;
+    font-weight: 700;
+    color: var(--dark);
+    margin-bottom: 8px;
+}
+
+.question-hint {
+    font-size: 14px;
+    color: var(--gray);
+    font-style: italic;
+}
+
+.audio-btn {
+    width: 80px;
+    height: 80px;
+    border-radius: 50%;
+    background: var(--secondary);
+    color: white;
+    border: none;
+    font-size: 32px;
+    cursor: pointer;
+    margin: 16px 0;
+    transition: transform 0.2s;
+}
+
+.audio-btn:hover {
+    transform: scale(1.1);
+}
+
+/* Answer Container */
+.answer-container {
+    padding: 20px;
+    background: var(--white);
+    border-top: 1px solid #e0e0e0;
+}
+
+/* Seçenekler */
+.options-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+}
+
+.option-btn {
+    padding: 16px;
+    background: var(--white);
+    border: 2px solid #e0e0e0;
+    border-radius: 12px;
+    font-size: 16px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s;
+    text-align: center;
+}
+
+.option-btn:hover {
+    border-color: var(--secondary);
+    background: rgba(28, 176, 246, 0.05);
+}
+
+.option-btn.selected {
+    border-color: var(--secondary);
+    background: rgba(28, 176, 246, 0.1);
+}
+
+.option-btn.correct {
+    border-color: var(--primary);
+    background: rgba(88, 204, 2, 0.1);
+}
+
+.option-btn.wrong {
+    border-color: #ff4b4b;
+    background: rgba(255, 75, 75, 0.1);
+}
+
+/* Text Input */
+.text-input-area {
+    display: flex;
+    gap: 12px;
+}
+
+.text-input-area input {
+    flex: 1;
+    padding: 16px;
+    font-size: 18px;
+    border: 2px solid #e0e0e0;
+    border-radius: 12px;
+    outline: none;
+    transition: border-color 0.2s;
+}
+
+.text-input-area input:focus {
+    border-color: var(--secondary);
+}
+
+/* Footer */
+.lesson-footer {
+    padding: 20px;
+    background: var(--white);
+    border-top: 1px solid #e0e0e0;
+}
+
+.feedback-area {
+    padding: 16px;
+    border-radius: 12px;
+    margin-bottom: 16px;
+    font-weight: 600;
+}
+
+.feedback-area.correct {
+    background: rgba(88, 204, 2, 0.1);
+    color: var(--primary-dark);
+}
+
+.feedback-area.wrong {
+    background: rgba(255, 75, 75, 0.1);
+    color: #e03e3e;
+}
+
+.btn-lesson {
+    width: 100%;
+    padding: 16px;
+    font-size: 16px;
+    font-weight: 700;
+    border: none;
+    border-radius: 12px;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.btn-check {
+    background: #e0e0e0;
+    color: #999;
+}
+
+.btn-check:not(:disabled),
+.btn-check.active {
+    background: #1cb0f6 !important;
+    color: white !important;
+    cursor: pointer;
+}
+
+.btn-check:not(:disabled):hover,
+.btn-check.active:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(28, 176, 246, 0.3);
+}
+
+.btn-continue {
+    background: var(--primary);
+    color: white;
+}
+
+.btn-continue:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(88, 204, 2, 0.3);
+}
+
+/* Complete Modal */
+.lesson-complete-modal {
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.8);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 1000;
+}
+
+.lesson-complete-modal .modal-content {
+    background: var(--white);
+    padding: 48px;
+    border-radius: 24px;
+    text-align: center;
+    max-width: 400px;
+}
+
+.modal-icon {
+    font-size: 64px;
+    margin-bottom: 16px;
+}
+
+.modal-content h2 {
+    font-size: 28px;
+    margin-bottom: 24px;
+}
+
+.modal-stats {
+    display: flex;
+    justify-content: center;
+    gap: 48px;
+    margin-bottom: 32px;
+}
+
+.modal-stats .stat {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+}
+
+.modal-stats .stat-value {
+    font-size: 32px;
+    font-weight: 800;
+    color: var(--primary);
+}
+
+.modal-stats .stat-label {
+    font-size: 14px;
+    color: var(--gray);
+}
+</style>
+
+<script>
+// Ders verileri
+const questions = {{ questions | tojson | safe }};
+const lessonId = {{ lesson.id }};
+let currentIndex = 0;
+let score = 0;
+let correctCount = 0;
+let selectedAnswer = null;
+let hearts = 5;
+
+// DOM elementleri - DOMContentLoaded içinde alınacak
+let questionArea, answerContainer, checkBtn, continueBtn, feedbackArea, progressFill, heartsCount;
+
+// Başlat
+document.addEventListener('DOMContentLoaded', function() {
+    // DOM elementlerini al
+    questionArea = document.getElementById('questionArea');
+    answerContainer = document.getElementById('answerContainer');
+    checkBtn = document.getElementById('checkBtn');
+    continueBtn = document.getElementById('continueBtn');
+    feedbackArea = document.getElementById('feedbackArea');
+    progressFill = document.getElementById('progressFill');
+    heartsCount = document.getElementById('heartsCount');
+    
+    console.log('DOM yüklendi');
+    console.log('checkBtn:', checkBtn);
+    console.log('Soru sayısı:', questions.length);
+    
+    // Buton eventlerini bağla
+    checkBtn.onclick = function() {
+        console.log('Kontrol Et tıklandı');
+        checkAnswer();
+    };
+    
+    continueBtn.onclick = function() {
+        console.log('Devam Et tıklandı');
+        nextQuestion();
+    };
+    
+    if (questions.length > 0) {
+        showQuestion(0);
+    } else {
+        questionArea.innerHTML = '<p>Bu ders için soru bulunamadı.</p>';
+    }
+});
+
+function showQuestion(index) {
+    const q = questions[index];
+    selectedAnswer = null;
+    checkBtn.disabled = true;
+    checkBtn.style.display = 'block';
+    continueBtn.style.display = 'none';
+    feedbackArea.style.display = 'none';
+    
+    // Progress güncelle
+    progressFill.style.width = ((index / questions.length) * 100) + '%';
+    
+    // Soru tipine göre göster
+    let questionHTML = '';
+    let answerHTML = '';
+    
+    if (q.type === 'word_to_turkish' || q.type === 'listen_select') {
+        // Seçenekli soru
+        questionHTML = `
+            <p class="question-type">${q.type === 'listen_select' ? 'Dinle ve seç' : 'Bu kelimenin Türkçe karşılığı nedir?'}</p>
+            <h2 class="question-text">${q.question}</h2>
+            ${q.hint ? `<p class="question-hint">${q.hint}</p>` : ''}
+        `;
+        
+        // Seçenekleri karıştır
+        const shuffled = [...q.options].sort(() => Math.random() - 0.5);
+        answerHTML = `<div class="options-grid">
+            ${shuffled.map(opt => `<button class="option-btn" data-value="${opt}">${opt}</button>`).join('')}
+        </div>`;
+    } else {
+        // Yazılı cevap
+        questionHTML = `
+            <p class="question-type">${q.type === 'turkish_to_word' ? 'İngilizce karşılığını yaz' : 'Boşluğu doldur'}</p>
+            <h2 class="question-text">${q.question}</h2>
+            ${q.hint ? `<p class="question-hint">İpucu: ${q.hint}</p>` : ''}
+        `;
+        
+        answerHTML = `<div class="text-input-area">
+            <input type="text" id="textAnswer" placeholder="Cevabını yaz..." autocomplete="off">
+        </div>`;
+    }
+    
+    questionArea.innerHTML = questionHTML;
+    answerContainer.innerHTML = answerHTML;
+    
+    // Event listener'lar
+    if (q.options && q.options.length > 0) {
+        const optionBtns = document.querySelectorAll('.option-btn');
+        console.log('Seçenek butonları bulundu:', optionBtns.length);
+        
+        optionBtns.forEach(btn => {
+            btn.onclick = function() {
+                console.log('Seçenek tıklandı:', this.dataset.value);
+                
+                // Tüm seçimlerden 'selected' kaldır
+                optionBtns.forEach(b => b.classList.remove('selected'));
+                
+                // Bu butona 'selected' ekle
+                this.classList.add('selected');
+                
+                // Seçimi kaydet
+                selectedAnswer = this.dataset.value;
+                console.log('selectedAnswer:', selectedAnswer);
+                
+                // Kontrol butonunu aktif et - disabled attribute'u tamamen kaldır
+                checkBtn.disabled = false;
+                checkBtn.removeAttribute('disabled');
+                checkBtn.classList.add('active');
+                console.log('checkBtn.disabled:', checkBtn.disabled);
+            };
+        });
+    } else {
+        const textInput = document.getElementById('textAnswer');
+        if (textInput) {
+            textInput.addEventListener('input', function() {
+                selectedAnswer = this.value.trim();
+                checkBtn.disabled = !selectedAnswer;
+            });
+            textInput.addEventListener('keypress', function(e) {
+                if (e.key === 'Enter' && selectedAnswer) {
+                    checkAnswer();
+                }
+            });
+        }
+    }
+}
+
+function checkAnswer() {
+    const q = questions[currentIndex];
+    const isCorrect = selectedAnswer.toLowerCase() === q.answer.toLowerCase();
+    
+    if (isCorrect) {
+        correctCount++;
+        feedbackArea.className = 'feedback-area correct';
+        feedbackArea.innerHTML = '<i class="bi bi-check-circle-fill"></i> Doğru!';
+        
+        // Doğru seçeneği yeşil yap
+        document.querySelectorAll('.option-btn').forEach(btn => {
+            if (btn.dataset.value === q.answer) {
+                btn.classList.add('correct');
+            }
+        });
+    } else {
+        hearts--;
+        heartsCount.textContent = hearts;
+        feedbackArea.className = 'feedback-area wrong';
+        feedbackArea.innerHTML = `<i class="bi bi-x-circle-fill"></i> Yanlış! Doğru cevap: <strong>${q.answer}</strong>`;
+        
+        // Seçimleri göster
+        document.querySelectorAll('.option-btn').forEach(btn => {
+            if (btn.dataset.value === q.answer) {
+                btn.classList.add('correct');
+            } else if (btn.classList.contains('selected')) {
+                btn.classList.add('wrong');
+            }
+        });
+    }
+    
+    feedbackArea.style.display = 'block';
+    checkBtn.style.display = 'none';
+    continueBtn.style.display = 'block';
+    
+    // Input disable
+    document.querySelectorAll('.option-btn').forEach(btn => btn.disabled = true);
+    const textInput = document.getElementById('textAnswer');
+    if (textInput) textInput.disabled = true;
+}
+
+function nextQuestion() {
+    currentIndex++;
+    
+    if (currentIndex >= questions.length) {
+        completeLesson();
+    } else {
+        showQuestion(currentIndex);
+    }
+}
+
+function completeLesson() {
+    score = Math.round((correctCount / questions.length) * 100);
+    
+    // API'ye gönder
+    fetch('/api/learn/complete-lesson', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ lesson_id: lessonId, score: score })
+    })
+    .then(res => res.json())
+    .then(data => {
+        document.getElementById('finalScore').textContent = score + '%';
+        document.getElementById('earnedXp').textContent = '+' + (data.xp_earned || 0);
+        document.getElementById('completeModal').style.display = 'flex';
+    })
+    .catch(err => {
+        console.error('Hata:', err);
+        document.getElementById('finalScore').textContent = score + '%';
+        document.getElementById('completeModal').style.display = 'flex';
+    });
+}
+</script>
+{% endblock %}

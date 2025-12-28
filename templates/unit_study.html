@@ -1,0 +1,263 @@
+{% extends "base.html" %}
+
+{% block title %}{{ unit_title }} - Duolingo Clone{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <div class="mb-4">
+        <a href="{{ url_for('courses') }}" class="btn btn-outline-secondary btn-sm">
+            <i class="fas fa-arrow-left"></i> Kurslar
+        </a>
+    </div>
+
+    <!-- Ünite Başlığı -->
+    <div class="row mb-5">
+        <div class="col-md-10">
+            <h1>{{ unit_title }}</h1>
+            <p class="lead text-muted">{{ unit_description }}</p>
+            <div>
+                <span class="badge bg-info">Seviye: {{ level }}</span>
+                {% if is_completed %}
+                <span class="badge bg-success">✅ Tamamlandı</span>
+                {% else %}
+                <span class="badge bg-warning">Devam Ediyor</span>
+                {% endif %}
+            </div>
+        </div>
+        <div class="col-md-2 text-end">
+            <div class="card text-center bg-light">
+                <div class="card-body">
+                    <h3 class="mb-0">{{ "%.0f"|format(progress) }}%</h3>
+                    <small class="text-muted">İlerleme</small>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- İlerleme Bar -->
+    <div class="progress mb-5" style="height: 20px;">
+        <div class="progress-bar bg-success" role="progressbar" 
+             style="width: {{ progress }}%"
+             aria-valuenow="{{ progress }}" 
+             aria-valuemin="0" aria-valuemax="100">
+        </div>
+    </div>
+
+    <div class="row">
+        <!-- Sol Taraf: Öğretim Materyalleri -->
+        <div class="col-lg-8">
+            
+            <!-- Kelime Listesi -->
+            {% if resources_vocab %}
+            <div class="card mb-4 shadow-sm">
+                <div class="card-header bg-primary text-white">
+                    <h5 class="card-title mb-0">📚 Kelimeler</h5>
+                </div>
+                <div class="card-body">
+                    <div class="list-group">
+                        {% for resource in resources_vocab %}
+                            {% set content = resource.content %}
+                            <div class="list-group-item">
+                                <div class="d-flex justify-content-between align-items-center">
+                                    <div>
+                                        <h6 class="mb-1">
+                                            {% if content.english %}{{ content.english }}{% endif %}
+                                            {% if content.turkish %}<span class="text-muted">({{ content.turkish }})</span>{% endif %}
+                                        </h6>
+                                        {% if content.pronunciation %}
+                                        <small class="text-muted">🔊 {{ content.pronunciation }}</small>
+                                        {% endif %}
+                                        {% if content.example %}
+                                        <p class="mb-0 text-muted small mt-2">
+                                            <em>"{{ content.example }}"</em>
+                                        </p>
+                                        {% endif %}
+                                    </div>
+                                    <button class="btn btn-sm btn-outline-primary" 
+                                            onclick="speakWord('{{ content.english or '' }}')">
+                                        🔊 Dinle
+                                    </button>
+                                </div>
+                            </div>
+                        {% endfor %}
+                    </div>
+                </div>
+            </div>
+            {% endif %}
+
+            <!-- Gramer Kuralları -->
+            {% if resources_grammar %}
+            <div class="card mb-4 shadow-sm">
+                <div class="card-header bg-info text-white">
+                    <h5 class="card-title mb-0">📖 Gramer Kuralları</h5>
+                </div>
+                <div class="card-body">
+                    {% for resource in resources_grammar %}
+                        {% set content = resource.content %}
+                        <div class="mb-4 pb-4 border-bottom">
+                            <h6>{{ content.title or 'Gramer Kuralı' }}</h6>
+                            <p>{{ content.explanation or '' }}</p>
+                            {% if content.examples %}
+                            <strong>Örnekler:</strong>
+                            <ul class="small">
+                                {% for example in content.examples %}
+                                <li>{{ example }}</li>
+                                {% endfor %}
+                            </ul>
+                            {% endif %}
+                        </div>
+                    {% endfor %}
+                </div>
+            </div>
+            {% endif %}
+
+            <!-- Örnek Cümleler -->
+            {% if resources_sentences %}
+            <div class="card mb-4 shadow-sm">
+                <div class="card-header bg-success text-white">
+                    <h5 class="card-title mb-0">💬 Örnek Cümleler</h5>
+                </div>
+                <div class="card-body">
+                    <div class="list-group">
+                        {% for resource in resources_sentences %}
+                            {% set content = resource.content %}
+                            <div class="list-group-item">
+                                <p class="mb-2">
+                                    <strong>{{ content.english or '' }}</strong>
+                                </p>
+                                <p class="text-muted mb-0">
+                                    {{ content.turkish or '' }}
+                                </p>
+                            </div>
+                        {% endfor %}
+                    </div>
+                </div>
+            </div>
+            {% endif %}
+
+            {% if not resources_vocab and not resources_grammar and not resources_sentences %}
+            <div class="alert alert-info">
+                <i class="fas fa-info-circle"></i> Bu ünite için henüz materyaller eklenmemiş.
+            </div>
+            {% endif %}
+        </div>
+
+        <!-- Sağ Taraf: Pratiş Seçenekleri -->
+        <div class="col-lg-4">
+            <div class="card shadow-sm mb-4 sticky-top" style="top: 20px;">
+                <div class="card-header bg-dark text-white">
+                    <h5 class="card-title mb-0">🎯 Pratik</h5>
+                </div>
+                <div class="card-body">
+                    <p class="text-muted">Bu ünitedeki konuları pratik etmek için:</p>
+                    
+                    <div class="d-grid gap-2">
+                        <a href="{{ url_for('practice_word') }}" class="btn btn-primary">
+                            <i class="fas fa-book"></i> Kelime Pratiği
+                        </a>
+                        <a href="{{ url_for('practice_sentence') }}" class="btn btn-info">
+                            <i class="fas fa-pen"></i> Cümle Pratiği
+                        </a>
+                        <a href="{{ url_for('pronunciation') }}" class="btn btn-warning">
+                            <i class="fas fa-microphone"></i> Telaffuz Pratiği
+                        </a>
+                    </div>
+
+                    <hr>
+
+                    <h6 class="mt-4">İlerleme</h6>
+                    <div class="progress mb-3" style="height: 20px;">
+                        <div class="progress-bar" role="progressbar" 
+                             style="width: {{ progress }}%"
+                             aria-valuenow="{{ progress }}" 
+                             aria-valuemin="0" aria-valuemax="100">
+                            {{ "%.0f"|format(progress) }}%
+                        </div>
+                    </div>
+
+                    <button class="btn btn-success w-100" onclick="completeUnit({{ unit_id }})">
+                        <i class="fas fa-check-circle"></i> Üniteyi Tamamla
+                    </button>
+                </div>
+            </div>
+
+            <!-- Başarılar -->
+            <div class="card shadow-sm">
+                <div class="card-header bg-warning text-dark">
+                    <h5 class="card-title mb-0">🏆 Başarılar</h5>
+                </div>
+                <div class="card-body">
+                    <div class="achievement-item mb-3">
+                        <div class="text-center">
+                            <div style="font-size: 40px;">🌟</div>
+                            <p class="mb-0"><strong>İlk Adım</strong></p>
+                            <small class="text-muted">İlk üniteyi başlat</small>
+                        </div>
+                    </div>
+                    <div class="achievement-item text-center">
+                        <div style="font-size: 40px;">🎉</div>
+                        <p class="mb-0"><strong>Ünite Ustası</strong></p>
+                        <small class="text-muted">Üniteyi %100 tamamla</small>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+function speakWord(word) {
+    if ('speechSynthesis' in window) {
+        const utterance = new SpeechSynthesisUtterance(word);
+        utterance.lang = 'en-US';
+        window.speechSynthesis.speak(utterance);
+    } else {
+        alert('Tarayıcınız sesli okuma özelliğini desteklemiyor.');
+    }
+}
+
+function completeUnit(unitId) {
+    fetch(`/api/unit/${unitId}/progress`, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ progress: 100 })
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            alert('🎉 Ünite tamamlandı!');
+            location.reload();
+        } else {
+            alert('Hata: ' + data.error);
+        }
+    })
+    .catch(error => {
+        console.error('Hata:', error);
+        alert('Sunucu hatası oluştu.');
+    });
+}
+
+// İlerlemeyi otomatik güncelle (pratik yapıldıkça)
+document.addEventListener('DOMContentLoaded', function() {
+    // Periyodik olarak ilerleme güncelle
+    setInterval(function() {
+        updateUnitProgress();
+    }, 10000);
+});
+
+function updateUnitProgress() {
+    // Gerçek uygulamada, pratik etkinliğine göre ilerleme hesapla
+    console.log('İlerleme güncelleniyor...');
+}
+</script>
+
+<style>
+    .achievement-item {
+        padding: 15px;
+        border-radius: 8px;
+        background: #f8f9fa;
+    }
+</style>
+{% endblock %}

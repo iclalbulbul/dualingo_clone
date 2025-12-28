@@ -1,0 +1,173 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="container mt-5">
+    <h2>🎯 Hedeflerim - {{ username }}</h2>
+    
+    <!-- Hedef Oluştur -->
+    <div class="card mb-4">
+        <div class="card-header bg-success text-white">
+            <h5>Yeni Hedef Oluştur</h5>
+        </div>
+        <div class="card-body">
+            <form method="post">
+                <div class="row">
+                    <div class="col-md-6">
+                        <div class="form-group">
+                            <label>Hedef Tipi</label>
+                            <select name="goal_type" class="form-control" required>
+                                <option value="daily_inputs">📊 Günlük Input Sayısı</option>
+                                <option value="weekly_inputs">📅 Haftalık Input Sayısı</option>
+                                <option value="accuracy">🎯 Doğruluk Yüzdesi (%)</option>
+                                <option value="streak_days">🔥 Ardışık Gün Sayısı</option>
+                                <option value="study_hours">⏱️ Çalışma Saati</option>
+                                <option value="word_count">📚 Kelime Öğrenme</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="form-group">
+                            <label>Hedef Değeri</label>
+                            <input type="number" name="target_value" class="form-control" placeholder="50" required>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="row">
+                    <div class="col-md-6">
+                        <div class="form-group">
+                            <label>Başlık</label>
+                            <input type="text" name="title" class="form-control" placeholder="Günlük 50 input" required>
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="form-group">
+                            <label>Deadline</label>
+                            <input type="date" name="deadline" class="form-control" required>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="form-group">
+                    <label>Açıklama</label>
+                    <textarea name="description" class="form-control" rows="2" placeholder="Bu hedef için notlar..."></textarea>
+                </div>
+                
+                <button type="submit" class="btn btn-success">✅ Hedef Oluştur</button>
+            </form>
+        </div>
+    </div>
+    
+    <!-- Önerilen Hedefler -->
+    {% if suggestions %}
+    <div class="card mb-4">
+        <div class="card-header bg-info text-white">
+            <h5>💡 Önerilen Hedefler</h5>
+        </div>
+        <div class="card-body">
+            <div class="row">
+                {% for suggestion in suggestions %}
+                <div class="col-md-4 mb-2">
+                    <div class="alert alert-info">
+                        <h6>{{ suggestion.title }}</h6>
+                        <p><small>{{ suggestion.description }}</small></p>
+                        <p><strong>Hedef:</strong> {{ suggestion.suggested_value }}</p>
+                        <p><strong>Deadline:</strong> {{ suggestion.deadline }}</p>
+                        <button class="btn btn-sm btn-success" onclick="fillGoalForm(
+                            '{{ suggestion.type }}',
+                            {{ suggestion.suggested_value }},
+                            '{{ suggestion.deadline }}',
+                            '{{ suggestion.title }}'
+                        )">✅ Bu Hedefi Ekle</button>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+    </div>
+    {% endif %}
+    
+    <!-- Aktif Hedefler -->
+    {% if active_goals %}
+    <div class="card mb-4">
+        <div class="card-header bg-warning">
+            <h5>📍 Aktif Hedefler ({{ active_goals|length }})</h5>
+        </div>
+        <div class="card-body">
+            {% for goal in active_goals %}
+            <div class="card mb-3">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between align-items-start">
+                        <div>
+                            <h6 class="mb-1">{{ goal.title }}</h6>
+                            {% if goal.description %}
+                            <p class="text-muted small mb-2">{{ goal.description }}</p>
+                            {% endif %}
+                        </div>
+                        <form action="{{ url_for('delete_goal', goal_id=goal.goal_id) }}" method="post" class="d-inline" onsubmit="return confirm('Bu hedefi silmek istediğine emin misin?');">
+                            <button type="submit" class="btn btn-sm btn-outline-danger" title="Hedefi Sil">🗑️</button>
+                        </form>
+                    </div>
+                    <div class="progress mb-2" style="height: 20px;">
+                        <div class="progress-bar {% if goal.progress_percent >= 100 %}bg-success{% elif goal.progress_percent >= 50 %}bg-info{% else %}bg-warning{% endif %}" 
+                             role="progressbar" 
+                             style="width: {{ goal.progress_percent }}%;" 
+                             aria-valuenow="{{ goal.progress_percent }}" 
+                             aria-valuemin="0" aria-valuemax="100">
+                            {{ goal.progress_percent|round(1) }}%
+                        </div>
+                    </div>
+                    <div class="d-flex justify-content-between small text-muted">
+                        <span>📈 {{ goal.current_progress|round(1) }} / {{ goal.target_value }}</span>
+                        <span>📅 {{ goal.deadline }}</span>
+                        <span class="{% if goal.days_remaining < 3 %}text-danger{% elif goal.days_remaining < 7 %}text-warning{% endif %}">⏰ {{ goal.days_remaining }} gün kaldı</span>
+                    </div>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+    {% else %}
+    <div class="alert alert-info">
+        ℹ️ Henüz aktif hedefin yok. Yeni bir hedef oluştur!
+    </div>
+    {% endif %}
+    
+    <!-- Tamamlanmış Hedefler -->
+    {% if completed_goals %}
+    <div class="card mb-4">
+        <div class="card-header bg-success">
+            <h5>✅ Tamamlanmış Hedefler ({{ completed_goals|length }})</h5>
+        </div>
+        <div class="card-body">
+            {% for goal in completed_goals %}
+            <div class="mb-2">
+                <p>
+                    <strong>{{ goal.title }}</strong> 🏆
+                    <br>
+                    <small>Tamamlanma: {{ goal.completed_at }}</small>
+                </p>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+    {% endif %}
+    
+    <div class="mt-3">
+        <a href="{{ url_for('dashboard') }}" class="btn btn-secondary">← Geri Dön</a>
+        <a href="{{ url_for('user_stats') }}" class="btn btn-primary">İstatistikler →</a>
+    </div>
+</div>
+
+<script>
+function fillGoalForm(type, value, deadline, title) {
+    document.querySelector('[name="goal_type"]').value = type;
+    document.querySelector('[name="target_value"]').value = value;
+    document.querySelector('[name="deadline"]').value = deadline;
+    document.querySelector('[name="title"]').value = title;
+    
+    // Formu otomatik submit et
+    document.querySelector('form').submit();
+}
+</script>
+{% endblock %}

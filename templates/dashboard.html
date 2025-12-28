@@ -1,13 +1,192 @@
 {% extends "base.html" %}
 
 {% block content %}
-<h2>Merhaba, {{ username }} 👋</h2>
-<p class="text-muted">LoroLeng ile kelime, cümle ve telaffuz pratiği yap.</p>
+<!-- Hoş Geldin -->
+<div class="welcome-section">
+    <h1 class="welcome-title">Merhaba, {{ username }} 👋</h1>
+    <p class="welcome-subtitle">LoroLeng ile her gün biraz daha iyi ol!</p>
+</div>
 
-<ul>
-    <li><a href="{{ url_for('practice_word') }}">Kelime Çalış (şimdilik basit)</a></li>
-    <li><a href="{{ url_for('practice_sentence') }}">Cümle & Grammar (demo)</a></li>
-    <li><a href="{{ url_for('pronunciation') }}">Telaffuz Pratiği (demo)</a></li>
-</ul>
+<!-- Hızlı İstatistikler -->
+<div class="row mb-4 g-3">
+    <div class="col-md-3 col-6">
+        <div class="stat-card stat-streak">
+            <div class="stat-icon">🔥</div>
+            <div class="stat-value" id="streakCount">0</div>
+            <div class="stat-label">Günlük Seri</div>
+        </div>
+    </div>
+    <div class="col-md-3 col-6">
+        <div class="stat-card stat-correct">
+            <div class="stat-icon">✅</div>
+            <div class="stat-value" id="todayCorrect">0</div>
+            <div class="stat-label">Bugün Doğru</div>
+        </div>
+    </div>
+    <div class="col-md-3 col-6">
+        <div class="stat-card stat-words">
+            <div class="stat-icon">📚</div>
+            <div class="stat-value" id="wordsLearned">0</div>
+            <div class="stat-label">Öğrenilen Kelime</div>
+        </div>
+    </div>
+    <div class="col-md-3 col-6">
+        <div class="stat-card stat-rank">
+            <div class="stat-icon">🏆</div>
+            <div class="stat-value" id="userRank">-</div>
+            <div class="stat-label">Sıralama</div>
+        </div>
+    </div>
+</div>
+
+<!-- Pratik Kartları -->
+<div class="section-header">
+    <i class="bi bi-lightning-charge-fill"></i>
+    <h2 class="section-title">Hızlı Pratik</h2>
+</div>
+<div class="row mb-4 g-4">
+    <div class="col-md-4">
+        <div class="practice-card practice-word">
+            <div class="practice-icon">📖</div>
+            <h3 class="practice-title">Kelime Çalış</h3>
+            <p class="practice-desc">İngilizce kelimeleri Türkçe'ye çevir ve kelime hazineni genişlet.</p>
+            <a href="{{ url_for('practice_word') }}" class="btn btn-modern btn-modern-secondary">
+                <i class="bi bi-play-fill"></i> Başla
+            </a>
+        </div>
+    </div>
+    <div class="col-md-4">
+        <div class="practice-card practice-sentence">
+            <div class="practice-icon">✍️</div>
+            <h3 class="practice-title">Cümle & Gramer</h3>
+            <p class="practice-desc">İngilizce cümleler yaz, gramer hatalarını öğren.</p>
+            <a href="{{ url_for('practice_sentence') }}" class="btn btn-modern btn-modern-primary">
+                <i class="bi bi-play-fill"></i> Başla
+            </a>
+        </div>
+    </div>
+    <div class="col-md-4">
+        <div class="practice-card practice-pronunciation">
+            <div class="practice-icon">🎤</div>
+            <h3 class="practice-title">Telaffuz Pratiği</h3>
+            <p class="practice-desc">Kelimeleri sesli söyle, telaffuzunu geliştir.</p>
+            <a href="{{ url_for('pronunciation') }}" class="btn btn-modern btn-modern-danger">
+                <i class="bi bi-play-fill"></i> Başla
+            </a>
+        </div>
+    </div>
+</div>
+
+<!-- Alt Bölüm: Hedefler ve Sosyal -->
+<div class="row g-4">
+    <!-- Aktif Hedefler -->
+    <div class="col-lg-6">
+        <div class="goals-card">
+            <div class="goals-card-header">
+                <i class="bi bi-bullseye"></i>
+                <h5>Aktif Hedefler</h5>
+            </div>
+            <div class="goals-card-body" id="activeGoals">
+                {% if active_goals and active_goals|length > 0 %}
+                    {% for goal in active_goals[:3] %}
+                    <div class="goal-item">
+                        <div class="goal-header">
+                            <span class="goal-title">{{ goal.title }}</span>
+                            <span class="goal-badge {% if goal.days_remaining < 3 %}bg-danger text-white{% elif goal.days_remaining < 7 %}bg-warning{% else %}bg-secondary text-white{% endif %}">
+                                {{ goal.days_remaining }} gün
+                            </span>
+                        </div>
+                        <div class="progress-modern">
+                            <div class="progress-bar" style="width: {{ goal.progress_percent }}%;"></div>
+                        </div>
+                        <div class="goal-progress-text">{{ goal.current_progress|round(1) }} / {{ goal.target_value }}</div>
+                    </div>
+                    {% endfor %}
+                    {% if active_goals|length > 3 %}
+                    <p class="text-muted small mt-2">+{{ active_goals|length - 3 }} hedef daha...</p>
+                    {% endif %}
+                {% else %}
+                <div class="text-center py-4">
+                    <div style="font-size: 48px; margin-bottom: 12px;">🎯</div>
+                    <p class="text-muted mb-3">Henüz hedef belirlemediniz.</p>
+                    <a href="{{ url_for('goals') }}" class="btn btn-modern btn-modern-primary btn-sm">
+                        <i class="bi bi-plus"></i> Hedef Oluştur
+                    </a>
+                </div>
+                {% endif %}
+            </div>
+            <div class="goals-card-footer">
+                <a href="{{ url_for('goals') }}" class="text-decoration-none" style="color: var(--primary); font-weight: 600;">
+                    Tüm hedefleri gör <i class="bi bi-arrow-right"></i>
+                </a>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Hızlı Linkler -->
+    <div class="col-lg-6">
+        <div class="goals-card">
+            <div class="goals-card-header">
+                <i class="bi bi-grid-fill" style="color: var(--secondary);"></i>
+                <h5>Hızlı Erişim</h5>
+            </div>
+            <div class="goals-card-body">
+                <div class="row g-3">
+                    <div class="col-6">
+                        <a href="{{ url_for('user_stats') }}" class="quick-link">
+                            <i class="bi bi-bar-chart-fill"></i>
+                            İstatistikler
+                        </a>
+                    </div>
+                    <div class="col-6">
+                        <a href="{{ url_for('leaderboard') }}" class="quick-link">
+                            <i class="bi bi-trophy-fill" style="color: var(--accent);"></i>
+                            Sıralama
+                        </a>
+                    </div>
+                    <div class="col-6">
+                        <a href="{{ url_for('personal_feedback') }}" class="quick-link">
+                            <i class="bi bi-robot" style="color: #a855f7;"></i>
+                            AI Geri Bildirim
+                        </a>
+                    </div>
+                    <div class="col-6">
+                        <a href="{{ url_for('custom_lesson') }}" class="quick-link">
+                            <i class="bi bi-magic" style="color: var(--primary);"></i>
+                            Özel Ders
+                        </a>
+                    </div>
+                    <div class="col-6">
+                        <a href="{{ url_for('friends') }}" class="quick-link">
+                            <i class="bi bi-people-fill" style="color: var(--secondary);"></i>
+                            Arkadaşlar
+                        </a>
+                    </div>
+                    <div class="col-6">
+                        <a href="{{ url_for('notifications') }}" class="quick-link">
+                            <i class="bi bi-bell-fill" style="color: var(--danger);"></i>
+                            Bildirimler
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+// Dashboard istatistiklerini yükle
+document.addEventListener('DOMContentLoaded', function() {
+    fetch('/api/dashboard-stats')
+        .then(response => response.json())
+        .then(data => {
+            if (data.streak) document.getElementById('streakCount').textContent = data.streak;
+            if (data.today_correct) document.getElementById('todayCorrect').textContent = data.today_correct;
+            if (data.words_learned) document.getElementById('wordsLearned').textContent = data.words_learned;
+            if (data.rank) document.getElementById('userRank').textContent = '#' + data.rank;
+        })
+        .catch(err => console.log('İstatistik yükleme hatası:', err));
+});
+</script>
 {% endblock %}
 

@@ -1,0 +1,142 @@
+{% extends "base.html" %}
+
+{% block title %}{{ course_name }} - Duolingo Clone{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <div class="mb-4">
+        <a href="{{ url_for('courses') }}" class="btn btn-outline-secondary btn-sm">
+            <i class="fas fa-arrow-left"></i> Geri
+        </a>
+    </div>
+
+    <!-- Kurs Başlığı ve İlerleme -->
+    <div class="row mb-5">
+        <div class="col-md-8">
+            <h1>{{ course_name }}</h1>
+            <p class="text-muted">{{ stats.get('total_units', 0) }} ünite | 
+               {% if stats.get('status') == 'completed' %}
+               <span class="badge bg-success">Tamamlandı</span>
+               {% else %}
+               <span class="badge bg-primary">Devam Ediyor</span>
+               {% endif %}
+            </p>
+        </div>
+    </div>
+
+    <!-- Genel İlerleme -->
+    <div class="card mb-5 shadow-sm">
+        <div class="card-body">
+            <h5 class="card-title">📊 Genel İlerleme</h5>
+            
+            <div class="row mb-4">
+                <div class="col-md-8">
+                    <div class="progress" style="height: 25px;">
+                        <div class="progress-bar bg-success" role="progressbar" 
+                             style="width: {{ stats.get('overall_progress', 0) }}%;"
+                             aria-valuenow="{{ stats.get('overall_progress', 0) }}" 
+                             aria-valuemin="0" aria-valuemax="100">
+                            <strong>{{ "%.0f"|format(stats.get('overall_progress', 0)) }}%</strong>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-4 text-end">
+                    <h6>{{ stats.get('completed_units', 0) }} / {{ stats.get('total_units', 0) }} ünite tamamlandı</h6>
+                </div>
+            </div>
+
+            <div class="row text-center">
+                <div class="col-4">
+                    <div class="p-3 bg-light rounded">
+                        <h3>{{ stats.get('completed_units', 0) }}</h3>
+                        <small class="text-muted">Tamamlanan</small>
+                    </div>
+                </div>
+                <div class="col-4">
+                    <div class="p-3 bg-light rounded">
+                        <h3>{{ stats.get('started_units', 0) }}</h3>
+                        <small class="text-muted">Başlanan</small>
+                    </div>
+                </div>
+                <div class="col-4">
+                    <div class="p-3 bg-light rounded">
+                        <h3>{{ stats.get('not_started_units', 0) }}</h3>
+                        <small class="text-muted">Başlanmadı</small>
+                    </div>
+                </div>
+            </div>
+
+            {% if stats.get('estimated_completion') %}
+            <div class="alert alert-info mt-4 mb-0">
+                📅 Tahmini bitiş tarihi: <strong>{{ stats.get('estimated_completion') }}</strong>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+
+    <!-- Üniteler -->
+    <div class="card shadow-sm">
+        <div class="card-header bg-primary text-white">
+            <h5 class="card-title mb-0">📖 Üniteler</h5>
+        </div>
+        <div class="card-body">
+            {% if units %}
+            <div class="list-group">
+                {% for unit in units %}
+                <a href="{{ url_for('unit_study', unit_id=unit.unit_id) }}" 
+                   class="list-group-item list-group-item-action">
+                    
+                    <div class="d-flex w-100 justify-content-between align-items-start">
+                        <div class="flex-grow-1">
+                            <h6 class="mb-1">
+                                {% if unit.status == 'completed' %}
+                                    ✅ 
+                                {% elif unit.status == 'in_progress' %}
+                                    🔄 
+                                {% else %}
+                                    🔒 
+                                {% endif %}
+                                Ünite {{ unit.unit_num }}: {{ unit.title }}
+                            </h6>
+                            <p class="mb-2 text-muted small">{{ unit.description }}</p>
+                            
+                            <!-- Mini Progress Bar -->
+                            <div class="progress" style="height: 8px;">
+                                <div class="progress-bar" role="progressbar" 
+                                     style="width: {{ unit.progress }}%"
+                                     aria-valuenow="{{ unit.progress }}" 
+                                     aria-valuemin="0" aria-valuemax="100">
+                                </div>
+                            </div>
+                            <small class="text-muted">{{ "%.0f"|format(unit.progress) }}%</small>
+                        </div>
+                        <div class="text-end">
+                            <span class="badge bg-light text-dark">{{ unit.level }}</span>
+                            {% if unit.completed_at %}
+                            <br><small class="text-success">✓ {{ unit.completed_at.strftime("%d.%m") }}</small>
+                            {% endif %}
+                        </div>
+                    </div>
+                </a>
+                {% endfor %}
+            </div>
+            {% else %}
+            <div class="alert alert-warning">
+                Bu kursta henüz ünite bulunmamaktadır.
+            </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+
+<style>
+    .list-group-item {
+        border: 1px solid #dee2e6;
+        transition: all 0.3s ease;
+    }
+    .list-group-item:hover {
+        background-color: #f8f9fa;
+        transform: translateX(5px);
+    }
+</style>
+{% endblock %}

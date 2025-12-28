@@ -1,0 +1,485 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="learn-page">
+    <!-- Üst Bar: XP ve Kalpler -->
+    <div class="learn-header">
+        <div class="learn-stats">
+            <div class="stat-item xp">
+                <i class="bi bi-lightning-charge-fill"></i>
+                <span>{{ course_map.total_xp or 0 }} XP</span>
+            </div>
+            <div class="stat-item crowns">
+                <i class="bi bi-trophy-fill"></i>
+                <span>{{ course_map.total_crowns or 0 }}</span>
+            </div>
+            <div class="stat-item hearts">
+                <i class="bi bi-heart-fill"></i>
+                <span>{{ course_map.hearts or 5 }}</span>
+            </div>
+            <div class="stat-item streak">
+                <i class="bi bi-fire"></i>
+                <span>{{ course_map.streak or 0 }} gün</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- Kurs Haritası -->
+    <div class="course-map">
+        {% for level in course_map.levels %}
+        <div class="level-section" data-level="{{ level.code }}">
+            <!-- Seviye Başlığı -->
+            <div class="level-header" style="--level-color: {{ level.color }}">
+                <span class="level-icon">{{ level.icon }}</span>
+                <div class="level-info">
+                    <h2 class="level-code">{{ level.code }}</h2>
+                    <span class="level-name">{{ level.name }}</span>
+                </div>
+            </div>
+
+            <!-- Üniteler -->
+            <div class="units-path">
+                {% for unit in level.units %}
+                <div class="unit-node {% if unit.status == 'locked' %}locked{% elif unit.status == 'completed' %}completed{% else %}active{% endif %}"
+                     data-unit-id="{{ unit.unit_id }}">
+                    
+                    <!-- Bağlantı Çizgisi -->
+                    {% if not loop.first %}
+                    <div class="unit-connector"></div>
+                    {% endif %}
+                    
+                    <!-- Ünite Dairesi -->
+                    <div class="unit-circle" style="--level-color: {{ level.color }}">
+                        {% if unit.status == 'locked' %}
+                            <i class="bi bi-lock-fill"></i>
+                        {% elif unit.status == 'completed' %}
+                            <span class="unit-icon">{{ unit.icon }}</span>
+                            <div class="crown-badge">👑 {{ unit.crowns }}</div>
+                        {% else %}
+                            <span class="unit-icon">{{ unit.icon }}</span>
+                        {% endif %}
+                    </div>
+                    
+                    <!-- Ünite Bilgisi -->
+                    <div class="unit-info">
+                        <h4 class="unit-title">{{ unit.title }}</h4>
+                        <p class="unit-desc">{{ unit.description }}</p>
+                        
+                        <!-- İlerleme Barı -->
+                        {% if unit.status != 'locked' %}
+                        {% set completed_lessons = unit.lessons|selectattr('status', 'equalto', 'completed')|list|length %}
+                        {% set total_lessons = unit.lessons|length %}
+                        <div class="unit-progress">
+                            <div class="progress-bar-mini">
+                                <div class="progress-fill" style="width: {{ (completed_lessons / total_lessons * 100) if total_lessons > 0 else 0 }}%"></div>
+                            </div>
+                            <span class="progress-text">{{ completed_lessons }}/{{ total_lessons }}</span>
+                        </div>
+                        {% endif %}
+                    </div>
+                    
+                    <!-- Ders Popup (tıklayınca açılır) -->
+                    {% if unit.status != 'locked' %}
+                    <div class="lessons-popup">
+                        <div class="popup-arrow"></div>
+                        <h5>{{ unit.title }}</h5>
+                        <div class="lessons-list">
+                            {% for lesson in unit.lessons %}
+                            <a href="{% if lesson.status != 'locked' %}{{ url_for('learn_lesson', lesson_id=lesson.lesson_id) }}{% else %}#{% endif %}"
+                               class="lesson-item {% if lesson.status == 'locked' %}locked{% elif lesson.status == 'completed' %}completed{% else %}active{% endif %}">
+                                <div class="lesson-icon">
+                                    {% if lesson.status == 'locked' %}
+                                        <i class="bi bi-lock-fill"></i>
+                                    {% elif lesson.status == 'completed' %}
+                                        <i class="bi bi-check-circle-fill"></i>
+                                    {% else %}
+                                        {% if lesson.type == 'vocabulary' %}
+                                            <i class="bi bi-book"></i>
+                                        {% elif lesson.type == 'translation' %}
+                                            <i class="bi bi-translate"></i>
+                                        {% elif lesson.type == 'listening' %}
+                                            <i class="bi bi-headphones"></i>
+                                        {% elif lesson.type == 'grammar' %}
+                                            <i class="bi bi-pencil"></i>
+                                        {% else %}
+                                            <i class="bi bi-patch-question"></i>
+                                        {% endif %}
+                                    {% endif %}
+                                </div>
+                                <div class="lesson-info">
+                                    <span class="lesson-title">{{ lesson.title }}</span>
+                                    <span class="lesson-xp">+{{ lesson.xp }} XP</span>
+                                </div>
+                                {% if lesson.status == 'completed' and lesson.best_score > 0 %}
+                                <div class="lesson-score">{{ lesson.best_score }}%</div>
+                                {% endif %}
+                            </a>
+                            {% endfor %}
+                        </div>
+                    </div>
+                    {% endif %}
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+</div>
+
+<style>
+/* ===== LEARN PAGE ===== */
+.learn-page {
+    max-width: 600px;
+    margin: 0 auto;
+    padding: 20px;
+}
+
+.learn-header {
+    background: var(--white);
+    border-radius: var(--border-radius);
+    padding: 16px 24px;
+    margin-bottom: 32px;
+    box-shadow: var(--shadow-sm);
+}
+
+.learn-stats {
+    display: flex;
+    justify-content: space-around;
+    gap: 16px;
+}
+
+.stat-item {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-weight: 700;
+    font-size: 16px;
+}
+
+.stat-item.xp { color: #ff9600; }
+.stat-item.crowns { color: #ffd700; }
+.stat-item.hearts { color: #ff4b4b; }
+.stat-item.streak { color: #ff9600; }
+
+.stat-item i {
+    font-size: 20px;
+}
+
+/* ===== LEVEL SECTION ===== */
+.level-section {
+    margin-bottom: 48px;
+}
+
+.level-header {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    padding: 16px 24px;
+    background: var(--white);
+    border-radius: var(--border-radius);
+    box-shadow: var(--shadow-sm);
+    margin-bottom: 24px;
+    border-left: 4px solid var(--level-color);
+}
+
+.level-icon {
+    font-size: 40px;
+}
+
+.level-code {
+    font-size: 24px;
+    font-weight: 800;
+    color: var(--level-color);
+    margin: 0;
+}
+
+.level-name {
+    color: var(--gray);
+    font-size: 14px;
+}
+
+/* ===== UNITS PATH ===== */
+.units-path {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0;
+}
+
+.unit-node {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    cursor: pointer;
+    margin-bottom: 24px;
+}
+
+.unit-connector {
+    position: absolute;
+    top: -24px;
+    width: 4px;
+    height: 24px;
+    background: #e0e0e0;
+}
+
+.unit-node.completed .unit-connector,
+.unit-node.active .unit-connector {
+    background: var(--primary);
+}
+
+.unit-circle {
+    width: 80px;
+    height: 80px;
+    border-radius: 50%;
+    background: var(--white);
+    border: 4px solid #e0e0e0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 32px;
+    position: relative;
+    transition: all 0.3s ease;
+    box-shadow: var(--shadow-sm);
+}
+
+.unit-node.active .unit-circle {
+    border-color: var(--level-color);
+    box-shadow: 0 0 0 4px rgba(88, 204, 2, 0.2);
+}
+
+.unit-node.completed .unit-circle {
+    border-color: var(--primary);
+    background: linear-gradient(135deg, #58cc02, #46a302);
+}
+
+.unit-node.completed .unit-circle .unit-icon {
+    filter: brightness(0) invert(1);
+}
+
+.unit-node.locked .unit-circle {
+    background: #f0f0f0;
+    color: #bbb;
+}
+
+.crown-badge {
+    position: absolute;
+    bottom: -8px;
+    right: -8px;
+    background: #ffd700;
+    color: #333;
+    font-size: 12px;
+    font-weight: 700;
+    padding: 2px 8px;
+    border-radius: 12px;
+    box-shadow: var(--shadow-sm);
+}
+
+.unit-info {
+    text-align: center;
+    margin-top: 12px;
+    max-width: 200px;
+}
+
+.unit-title {
+    font-size: 16px;
+    font-weight: 700;
+    color: var(--dark);
+    margin: 0 0 4px;
+}
+
+.unit-node.locked .unit-title {
+    color: #bbb;
+}
+
+.unit-desc {
+    font-size: 12px;
+    color: var(--gray);
+    margin: 0;
+}
+
+.unit-progress {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    margin-top: 8px;
+}
+
+.progress-bar-mini {
+    width: 60px;
+    height: 6px;
+    background: #e0e0e0;
+    border-radius: 3px;
+    overflow: hidden;
+}
+
+.progress-fill {
+    height: 100%;
+    background: var(--primary);
+    border-radius: 3px;
+    transition: width 0.3s ease;
+}
+
+.progress-text {
+    font-size: 11px;
+    color: var(--gray);
+    font-weight: 600;
+}
+
+/* ===== LESSONS POPUP ===== */
+.lessons-popup {
+    display: none;
+    position: absolute;
+    top: 100%;
+    left: 50%;
+    transform: translateX(-50%);
+    margin-top: 16px;
+    background: var(--white);
+    border-radius: var(--border-radius);
+    box-shadow: var(--shadow-lg);
+    padding: 16px;
+    min-width: 280px;
+    z-index: 100;
+}
+
+.unit-node:hover .lessons-popup,
+.unit-node.show-popup .lessons-popup {
+    display: block;
+}
+
+.popup-arrow {
+    position: absolute;
+    top: -8px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 0;
+    height: 0;
+    border-left: 8px solid transparent;
+    border-right: 8px solid transparent;
+    border-bottom: 8px solid var(--white);
+}
+
+.lessons-popup h5 {
+    margin: 0 0 12px;
+    font-size: 16px;
+    font-weight: 700;
+}
+
+.lessons-list {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.lesson-item {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 12px;
+    background: var(--light);
+    border-radius: 12px;
+    text-decoration: none;
+    color: var(--dark);
+    transition: all 0.2s ease;
+}
+
+.lesson-item:hover:not(.locked) {
+    background: #e8f5e9;
+    transform: translateX(4px);
+}
+
+.lesson-item.locked {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+.lesson-item.completed {
+    background: #e8f5e9;
+}
+
+.lesson-item.completed .lesson-icon {
+    color: var(--primary);
+}
+
+.lesson-icon {
+    width: 36px;
+    height: 36px;
+    background: var(--white);
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 16px;
+}
+
+.lesson-info {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+}
+
+.lesson-title {
+    font-weight: 600;
+    font-size: 14px;
+}
+
+.lesson-xp {
+    font-size: 12px;
+    color: #ff9600;
+    font-weight: 600;
+}
+
+.lesson-score {
+    background: var(--primary);
+    color: white;
+    padding: 4px 10px;
+    border-radius: 12px;
+    font-size: 12px;
+    font-weight: 700;
+}
+
+/* ===== RESPONSIVE ===== */
+@media (max-width: 576px) {
+    .learn-stats {
+        flex-wrap: wrap;
+    }
+    
+    .stat-item {
+        font-size: 14px;
+    }
+    
+    .unit-circle {
+        width: 64px;
+        height: 64px;
+        font-size: 24px;
+    }
+    
+    .lessons-popup {
+        min-width: 260px;
+    }
+}
+</style>
+
+<script>
+// Ünite tıklama
+document.querySelectorAll('.unit-node:not(.locked)').forEach(node => {
+    node.addEventListener('click', function(e) {
+        // Popup toggle
+        document.querySelectorAll('.unit-node.show-popup').forEach(n => {
+            if (n !== this) n.classList.remove('show-popup');
+        });
+        this.classList.toggle('show-popup');
+    });
+});
+
+// Dışarı tıklanınca popup kapat
+document.addEventListener('click', function(e) {
+    if (!e.target.closest('.unit-node')) {
+        document.querySelectorAll('.unit-node.show-popup').forEach(n => {
+            n.classList.remove('show-popup');
+        });
+    }
+});
+</script>
+{% endblock %}

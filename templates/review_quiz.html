@@ -1,0 +1,39 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<h2>Tekrar Quizleri</h2>
+<p>Burada daha önce yaptığınız hataları tekrar edebilirsiniz.</p>
+
+{% if not quiz_items %}
+  <p>Şu anda tekrar için gelen bir öğe yok.</p>
+{% else %}
+  <ul>
+  {% for it in quiz_items %}
+    <li style="margin-bottom:18px; padding:10px; border:1px solid #ddd;">
+      <strong>{{ it.item_key }}</strong> — <em>{{ it.context }}</em>
+      <div style="margin-top:6px;">{{ it.prompt }}</div>
+      <div style="margin-top:8px; color:#666;">Son görülme: {{ it.meta.last_seen }}</div>
+
+      <form method="post" action="{{ url_for('review_submit') }}" style="margin-top:8px;">
+        <input type="hidden" name="mistake_id" value="{{ it.mistake_id }}" />
+        <input type="hidden" name="item_key" value="{{ it.item_key }}" />
+
+        <label>Değerlendirme (0-5):</label>
+        <select name="quality">
+          <option value="5">5 — Çok iyi</option>
+          <option value="4">4 — İyi</option>
+          <option value="3">3 — Kabul edilir</option>
+          <option value="2">2 — Zayıf</option>
+          <option value="1">1 — Çok zayıf</option>
+          <option value="0">0 — Yanlış</option>
+        </select>
+        <button type="submit">Kaydet</button>
+      </form>
+
+      <div style="margin-top:6px; color:#444;">Doğru cevap: <strong>{{ it.correct_answer or '—' }}</strong></div>
+    </li>
+  {% endfor %}
+  </ul>
+{% endif %}
+
+{% endblock %}

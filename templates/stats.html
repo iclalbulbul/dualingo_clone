@@ -1,0 +1,138 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="container mt-5">
+    <h2>📊 İstatistikler - {{ username }}</h2>
+    
+    <!-- Günlük Özet -->
+    <div class="row mt-4">
+        <div class="col-md-6">
+            <div class="card">
+                <div class="card-header bg-primary text-white">
+                    <h5>📅 Bugün</h5>
+                </div>
+                <div class="card-body">
+                    <p><strong>Toplam Input:</strong> {{ daily.total_inputs }}</p>
+                    <p><strong>Doğru Cevaplar:</strong> {{ daily.correct_answers }}</p>
+                    <p><strong>Doğruluk:</strong> {{ "%.1f"|format(daily.accuracy_percent) }}%</p>
+                    <p><strong>Oturum Sayısı:</strong> {{ daily.total_sessions }}</p>
+                    <p><strong>Toplam Dakika:</strong> {{ daily.total_minutes }}</p>
+                </div>
+            </div>
+        </div>
+        
+        <div class="col-md-6">
+            <div class="card">
+                <div class="card-header bg-success text-white">
+                    <h5>📈 Bu Hafta</h5>
+                </div>
+                <div class="card-body">
+                    <p><strong>Toplam Input:</strong> {{ weekly.total_inputs }}</p>
+                    <p><strong>Doğru Cevaplar:</strong> {{ weekly.correct_answers }}</p>
+                    <p><strong>Doğruluk:</strong> {{ "%.1f"|format(weekly.accuracy_percent) }}%</p>
+                    <p><strong>Ardışık Günler:</strong> {{ weekly.streak_days }} 🔥</p>
+                    <p><strong>En İyi Gün:</strong> {{ weekly.best_day }}</p>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Genel İstatistikler -->
+    <div class="card mt-4">
+        <div class="card-header bg-info text-white">
+            <h5>🎯 Tüm Zamanlar</h5>
+        </div>
+        <div class="card-body">
+            <div class="row">
+                <div class="col-md-3">
+                    <h6>Toplam Input</h6>
+                    <p class="display-4">{{ overall.total_inputs }}</p>
+                </div>
+                <div class="col-md-3">
+                    <h6>Doğru Cevaplar</h6>
+                    <p class="display-4">{{ overall.correct_answers }}</p>
+                </div>
+                <div class="col-md-3">
+                    <h6>Genel Doğruluk</h6>
+                    <p class="display-4">{{ "%.1f"|format(overall.accuracy_percent) }}%</p>
+                </div>
+                <div class="col-md-3">
+                    <h6>Ortalama Skor</h6>
+                    <p class="display-4">{{ "%.1f"|format(overall.average_score) }}</p>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Kelime Performansı -->
+    <div class="card mt-4">
+        <div class card-header bg-warning">
+            <h5>📚 Kelime Performansı</h5>
+        </div>
+        <div class="card-body">
+            <div class="row">
+                <div class="col-md-6">
+                    <h6>En Zayıf Kelimeler</h6>
+                    <ul class="list-group">
+                        {% for word in word_perf.hardest_words[:5] %}
+                        <li class="list-group-item">
+                            {{ word.word }} - {{ "%.1f"|format(word.accuracy) }}%
+                        </li>
+                        {% endfor %}
+                    </ul>
+                </div>
+                <div class="col-md-6">
+                    <h6>En Kolay Kelimeler</h6>
+                    <ul class="list-group">
+                        {% for word in word_perf.easiest_words[:5] %}
+                        <li class="list-group-item">
+                            {{ word.word }} - {{ "%.1f"|format(word.accuracy) }}%
+                        </li>
+                        {% endfor %}
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Haftalık Rapor -->
+    <div class="card mt-4">
+        <div class="card-header bg-secondary text-white">
+            <h5>📋 Haftalık Rapor</h5>
+        </div>
+        <div class="card-body">
+            <div class="row">
+                <div class="col-md-4">
+                    <p><strong>Toplam Input:</strong> {{ weekly_report.summary.total_inputs }}</p>
+                    <p><strong>Doğruluk:</strong> {{ weekly_report.summary.accuracy }}%</p>
+                    <p><strong>Toplam Saat:</strong> {{ weekly_report.summary.total_hours }}</p>
+                </div>
+                <div class="col-md-4">
+                    <p><strong>Ardışık Günler:</strong> {{ weekly_report.summary.streak_days }} 🔥</p>
+                    <p><strong>İyileşme:</strong> +{{ weekly_report.summary.improvement }}%</p>
+                </div>
+                <div class="col-md-4">
+                    <h6>Bu Haftanın Başarıları</h6>
+                    {% for achievement in weekly_report.achievements %}
+                    <p><small>{{ achievement }}</small></p>
+                    {% endfor %}
+                </div>
+            </div>
+            
+            <hr>
+            
+            <h6>Öneriler</h6>
+            <ul>
+                {% for recommendation in weekly_report.recommendations %}
+                <li>{{ recommendation }}</li>
+                {% endfor %}
+            </ul>
+        </div>
+    </div>
+    
+    <div class="mt-3">
+        <a href="{{ url_for('dashboard') }}" class="btn btn-secondary">← Geri Dön</a>
+        <a href="{{ url_for('goals') }}" class="btn btn-primary">Hedeflerim →</a>
+    </div>
+</div>
+{% endblock %}

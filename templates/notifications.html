@@ -1,0 +1,69 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="container mt-5">
+    <div class="row">
+        <div class="col-md-3">
+            <h4>📬 Bildirimler</h4>
+            <p class="badge badge-danger">{{ unread_count }} Okunmamış</p>
+        </div>
+        <div class="col-md-9 text-right">
+            <form method="post" action="#" style="display:inline;">
+                <button type="button" class="btn btn-sm btn-secondary" onclick="markAllAsRead()">
+                    ✓ Tümünü Okundu İşaretle
+                </button>
+            </form>
+        </div>
+    </div>
+    
+    <hr>
+    
+    {% if notifications %}
+    <div class="list-group">
+        {% for notif in notifications %}
+        <div class="list-group-item {% if not notif.is_read %}bg-light{% endif %}">
+            <div class="row">
+                <div class="col-md-1 text-center">
+                    <span style="font-size: 1.5em;">{{ notif.icon or '📢' }}</span>
+                </div>
+                <div class="col-md-9">
+                    <h6>{{ notif.title }}</h6>
+                    <p class="mb-1">{{ notif.message }}</p>
+                    <small class="text-muted">{{ notif.created_at }}</small>
+                </div>
+                <div class="col-md-2 text-right">
+                    {% if not notif.is_read %}
+                    <form method="post" action="{{ url_for('mark_notification_read', notification_id=notif.notification_id) }}" style="display:inline;">
+                        <button type="submit" class="btn btn-sm btn-primary">Oku</button>
+                    </form>
+                    {% else %}
+                    <span class="badge badge-secondary">Okundu</span>
+                    {% endif %}
+                    
+                    {% if notif.action_url %}
+                    <a href="{{ notif.action_url }}" class="btn btn-sm btn-info">Git</a>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+    {% else %}
+    <div class="alert alert-info text-center">
+        ✨ Tüm bildirimler okundu!
+    </div>
+    {% endif %}
+    
+    <div class="mt-4">
+        <a href="{{ url_for('dashboard') }}" class="btn btn-secondary">← Geri Dön</a>
+    </div>
+</div>
+
+<script>
+function markAllAsRead() {
+    // Ajax çağrısı yapılabilir
+    alert('Tüm bildirimler okundu olarak işaretlendi!');
+    location.reload();
+}
+</script>
+{% endblock %}

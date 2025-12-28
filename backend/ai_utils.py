@@ -1,5 +1,5 @@
 """
-SmartLang – AI Utilities
+AI Utilities
 
 Bu modül:
 - Kelime çevirisi
@@ -16,14 +16,15 @@ import os
 from dotenv import load_dotenv
 import json
 
-from openai import OpenAI
+from google import genai
+
 
 load_dotenv()
-API_KEY = os.getenv("OPENAI_API_KEY")
+API_KEY = os.getenv("API_KEY")
 
 client = None
 if API_KEY:
-    client = OpenAI(api_key=API_KEY)
+    model = genai.Client(api_key=API_KEY)
 else:
     # "API key yoksa dummy moda düşüyor"
     print("WARNING: OPENAI_API_KEY set edilmemiş, ai_utils dummy modda çalışacak.")
@@ -31,21 +32,21 @@ else:
 
 def _llm_chat(prompt: str, system: str = "You are an English teacher.") -> str:
     """
-    Tüm LLM çağrıları buradan geçer. Eğer API yoksa dummy cevap döner.
+    Tüm LLM çağrıları buradan geçer.
+    Eğer API yoksa dummy cevap döner.
     """
-    if client is None:
-        # Fallback: gerçek LLM yokken sahte cevap
-        return "️ Şu an LLM'e bağlı değiliz (dummy cevap). Prompt: " + prompt[:80]
 
-    resp = client.chat.completions.create(
-        model="gpt-4o-mini",
-        messages=[
-            {"role": "system", "content": system},
-            {"role": "user", "content": prompt},
-        ],
-        temperature=0.3,
+    if model is None:
+        # Fallback: gerçek LLM yokken sahte cevap
+        return "Şu an LLM'e bağlı değiliz (dummy cevap). Prompt: " + prompt[:80]
+
+    response = model.models.generate_content(
+        model="gemini-2.5-flash",
+        contents=f"Sistem: {system} Prompt: {prompt}",
     )
-    return resp.choices[0].message.content.strip()
+    
+
+    return response.text
 
 def translate_word(word: str) -> str:
     """
@@ -108,12 +109,16 @@ def grammar_feedback_json(sentence: str) -> dict:
          {{"part": "<yanlış kısım>", "explanation_tr": "<Türkçe açıklama>"}}
       ]
     }}
-
+    
     Kurallar:
     - Sadece JSON döndür.
     - Açıklamaları Türkçe yaz.
+    
+    but not use ```json just text but but json format.
     """
     result = _llm_chat(prompt, system="You are an English grammar teacher.")
+    
+    print(result)
 
     try:
         data = json.loads(result)
@@ -130,7 +135,6 @@ def grammar_feedback_json(sentence: str) -> dict:
         }
 
     return data
-
 
 def personalized_feedback(user_stats: dict) -> str:
     """
@@ -196,22 +200,10 @@ def pronunciation_feedback(expected: str, recognized: str) -> dict:
       "score": number,
       "feedback_tr": string
     }}
+    but not use ```json just text but but json format.
     """
 
     result = _llm_chat(prompt, system="You are an English pronunciation coach.")
 
-    # API yoksa fallback
-    if result.startswith("⚠️"):
-        return {
-            "score": 50,
-            "feedback_tr": "Telaffuz kısmen doğru ancak daha net konuşmalısın."
-        }
+    return json.loads(result)
 
-    import json
-    try:
-        return json.loads(result)
-    except:
-        return {
-            "score": 60,
-            "feedback_tr": "Telaffuz değerlendirildi ancak ayrıntı alınamadı."
-        }

@@ -1,0 +1,104 @@
+{% extends "base.html" %}
+
+{% block title %}Kişisel Geri Bildirim - SmartLang{% endblock %}
+
+{% block content %}
+<div class="container py-4">
+    <div class="row">
+        <div class="col-12">
+            <h2 class="mb-4">
+                <i class="bi bi-robot"></i> Kişisel Geri Bildirim
+            </h2>
+            <p class="text-muted">AI destekli kişiselleştirilmiş öneriler</p>
+        </div>
+    </div>
+
+    <div class="row">
+        <!-- AI Geri Bildirim -->
+        <div class="col-lg-8">
+            <div class="card shadow-sm mb-4">
+                <div class="card-header bg-primary text-white">
+                    <h5 class="mb-0">
+                        <i class="bi bi-chat-quote"></i> AI Koçundan Mesaj
+                    </h5>
+                </div>
+                <div class="card-body">
+                    {% if feedback %}
+                    <div class="p-3 bg-light rounded">
+                        <p class="lead mb-0" style="white-space: pre-line;">{{ feedback }}</p>
+                    </div>
+                    {% else %}
+                    <div class="text-center py-4">
+                        <i class="bi bi-robot display-4 text-muted"></i>
+                        <p class="mt-3 text-muted">AI koçundan kişisel geri bildirim almak için butona tıkla</p>
+                        <form method="POST">
+                            <button type="submit" class="btn btn-primary btn-lg" id="feedbackBtn">
+                                <i class="bi bi-stars"></i> AI Geri Bildirim Al
+                            </button>
+                        </form>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+
+        <!-- İstatistikler -->
+        <div class="col-lg-4">
+            <div class="card shadow-sm mb-4">
+                <div class="card-header bg-success text-white">
+                    <h5 class="mb-0">
+                        <i class="bi bi-graph-up"></i> Özet İstatistikler
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <ul class="list-group list-group-flush">
+                        <li class="list-group-item d-flex justify-content-between">
+                            <span>Toplam Giriş:</span>
+                            <strong>{{ stats.total_inputs or 0 }}</strong>
+                        </li>
+                        <li class="list-group-item d-flex justify-content-between">
+                            <span>Doğru Cevap:</span>
+                            <strong>{{ stats.correct_answers or 0 }}</strong>
+                        </li>
+                        <li class="list-group-item d-flex justify-content-between">
+                            <span>Doğruluk:</span>
+                            <strong class="text-success">%{{ stats.accuracy_percent or 0 }}</strong>
+                        </li>
+                    </ul>
+                </div>
+            </div>
+
+            {% if weak_words %}
+            <div class="card shadow-sm">
+                <div class="card-header bg-warning">
+                    <h5 class="mb-0">
+                        <i class="bi bi-exclamation-triangle"></i> Zayıf Kelimeler
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <div class="d-flex flex-wrap gap-2">
+                        {% for word in weak_words %}
+                        <span class="badge bg-danger fs-6">{{ word }}</span>
+                        {% endfor %}
+                    </div>
+                    <a href="{{ url_for('practice_word') }}" class="btn btn-outline-primary btn-sm mt-3">
+                        <i class="bi bi-arrow-repeat"></i> Bu kelimeleri çalış
+                    </a>
+                </div>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+
+    <div class="row mt-4">
+        <div class="col-12">
+            <a href="{{ url_for('dashboard') }}" class="btn btn-secondary">
+                <i class="bi bi-arrow-left"></i> Dashboard'a Dön
+            </a>
+            <a href="{{ url_for('custom_lesson') }}" class="btn btn-primary">
+                <i class="bi bi-book"></i> Özel Ders Oluştur
+            </a>
+        </div>
+    </div>
+</div>
+{% endblock %}

@@ -1,0 +1,113 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="container mt-5">
+    <h2>👥 Arkadaşlar - {{ username }}</h2>
+    
+    <!-- Arkadaş İstekleri -->
+    {% if friend_requests %}
+    <div class="card mb-4">
+        <div class="card-header bg-warning text-dark">
+            <h5>📨 Arkadaş İstekleri ({{ friend_requests|length }})</h5>
+        </div>
+        <div class="card-body">
+            {% for request in friend_requests %}
+            <div class="row mb-2">
+                <div class="col-md-8">
+                    <p>
+                        <strong>{{ request.requester_username }}</strong>
+                        <br>
+                        <small class="text-muted">{{ request.requested_at }}</small>
+                    </p>
+                </div>
+                <div class="col-md-4 text-right">
+                    <form method="post" action="{{ url_for('confirm_friend_request', friendship_id=request.friendship_id) }}" style="display:inline;">
+                        <button type="submit" class="btn btn-sm btn-success">✓ Kabul Et</button>
+                    </form>
+                    <button class="btn btn-sm btn-danger">✗ Reddet</button>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+    {% endif %}
+    
+    <!-- Arkadaş Listesi -->
+    <div class="card mb-4">
+        <div class="card-header bg-primary text-white">
+            <h5>👫 Arkadaşlarım ({{ friends|length }})</h5>
+        </div>
+        <div class="card-body">
+            {% if friends %}
+            <div class="row">
+                {% for friend in friends %}
+                <div class="col-md-4 mb-3">
+                    <div class="card">
+                        <div class="card-body">
+                            <h5>
+                                <a href="{{ url_for('user_profile', user_id=friend.friend_id) }}">
+                                    {{ friend.friend_username }}
+                                </a>
+                            </h5>
+                            <p><strong>Level:</strong> {{ friend.friend_level }}</p>
+                            <p><small class="text-muted">Arkadaş Olunca: {{ friend.confirmed_at }}</small></p>
+                            <div class="btn-group btn-block" role="group">
+                                <a href="{{ url_for('user_profile', user_id=friend.friend_id) }}" 
+                                   class="btn btn-sm btn-info">Profil</a>
+                                <form method="post" action="#" style="display:inline; width: 50%;">
+                                    <button type="button" class="btn btn-sm btn-danger btn-block" 
+                                            onclick="removeFriend({{ friend.friend_id }})">Sil</button>
+                                </form>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+            {% else %}
+            <p class="text-muted">Henüz arkadaşın yok. Başka kullanıcılar bul!</p>
+            {% endif %}
+        </div>
+    </div>
+    
+    <!-- Aktivite Akışı -->
+    {% if activity_feed %}
+    <div class="card mb-4">
+        <div class="card-header bg-info text-white">
+            <h5>📊 Arkadaşların Aktivitesi</h5>
+        </div>
+        <div class="card-body">
+            <div class="activity-feed">
+                {% for activity in activity_feed[:10] %}
+                <div class="mb-2">
+                    <small>
+                        <strong>{{ activity.friend_username }}</strong>
+                        — {{ activity.activity_type }}
+                        ({{ activity.input_type }})
+                        — Skor: {{ activity.score }}
+                        <br>
+                        <em class="text-muted">{{ activity.timestamp }}</em>
+                    </small>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+    </div>
+    {% endif %}
+    
+    <div class="mt-3">
+        <a href="{{ url_for('dashboard') }}" class="btn btn-secondary">← Geri Dön</a>
+        <a href="{{ url_for('leaderboard') }}" class="btn btn-primary">Sıralamalar →</a>
+    </div>
+</div>
+
+<script>
+function removeFriend(friendId) {
+    if (confirm('Arkadaşı silmek istediğine emin misin?')) {
+        // İşlemi gerçekleştir
+        alert('Arkadaş silindi!');
+        location.reload();
+    }
+}
+</script>
+{% endblock %}

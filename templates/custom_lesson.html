@@ -1,0 +1,150 @@
+{% extends "base.html" %}
+
+{% block title %}Özel Ders Oluştur - SmartLang{% endblock %}
+
+{% block content %}
+<div class="container py-4">
+    <div class="row">
+        <div class="col-12">
+            <h2 class="mb-4">
+                <i class="bi bi-magic"></i> AI ile Özel Ders Oluştur
+            </h2>
+            <p class="text-muted">İstediğin konuda yapay zeka destekli mini ders al</p>
+        </div>
+    </div>
+
+    {% if error_message %}
+    <div class="row">
+        <div class="col-12">
+            <div class="alert alert-danger alert-dismissible fade show" role="alert">
+                <i class="bi bi-exclamation-triangle"></i> {{ error_message }}
+                <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+
+    <div class="row">
+        <!-- Konu Seçimi -->
+        <div class="col-lg-4">
+            <div class="card shadow-sm mb-4">
+                <div class="card-header bg-primary text-white">
+                    <h5 class="mb-0">
+                        <i class="bi bi-pencil-square"></i> Konu Seç
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <form method="POST">
+                        <div class="mb-3">
+                            <label for="topic" class="form-label">Ne öğrenmek istiyorsun?</label>
+                            <input type="text" 
+                                   class="form-control form-control-lg" 
+                                   id="topic" 
+                                   name="topic" 
+                                   placeholder="Örn: past tense, colors, animals..."
+                                   value="{{ topic or '' }}"
+                                   required>
+                            <div class="form-text">Herhangi bir İngilizce konusu yazabilirsin</div>
+                        </div>
+                        
+                        <div class="mb-3">
+                            <label for="level" class="form-label">Seviye</label>
+                            <select class="form-select" id="level" name="level">
+                                <option value="A1" {% if level == 'A1' %}selected{% endif %}>A1 - Başlangıç</option>
+                                <option value="A1-A2" {% if level == 'A1-A2' %}selected{% endif %}>A1-A2 - Temel</option>
+                                <option value="A2" {% if level == 'A2' %}selected{% endif %}>A2 - Alt Orta</option>
+                                <option value="A2-B1" {% if level == 'A2-B1' %}selected{% endif %}>A2-B1 - Orta</option>
+                                <option value="B1" {% if level == 'B1' %}selected{% endif %}>B1 - Orta</option>
+                                <option value="B1-B2" {% if level == 'B1-B2' %}selected{% endif %}>B1-B2 - Üst Orta</option>
+                                <option value="B2" {% if level == 'B2' %}selected{% endif %}>B2 - Üst Orta</option>
+                            </select>
+                        </div>
+                        
+                        <button type="submit" class="btn btn-success btn-lg w-100" id="submitBtn">
+                            <i class="bi bi-stars"></i> Ders Oluştur
+                        </button>
+                    </form>
+                </div>
+            </div>
+
+            <!-- Popüler Konular -->
+            <div class="card shadow-sm">
+                <div class="card-header">
+                    <h6 class="mb-0">💡 Popüler Konular</h6>
+                </div>
+                <div class="card-body">
+                    <div class="d-flex flex-wrap gap-2">
+                        <button class="btn btn-outline-secondary btn-sm topic-btn" data-topic="past tense">Past Tense</button>
+                        <button class="btn btn-outline-secondary btn-sm topic-btn" data-topic="present continuous">Present Continuous</button>
+                        <button class="btn btn-outline-secondary btn-sm topic-btn" data-topic="colors">Colors</button>
+                        <button class="btn btn-outline-secondary btn-sm topic-btn" data-topic="food and drinks">Food & Drinks</button>
+                        <button class="btn btn-outline-secondary btn-sm topic-btn" data-topic="travel vocabulary">Travel</button>
+                        <button class="btn btn-outline-secondary btn-sm topic-btn" data-topic="daily routines">Daily Routines</button>
+                        <button class="btn btn-outline-secondary btn-sm topic-btn" data-topic="comparatives">Comparatives</button>
+                        <button class="btn btn-outline-secondary btn-sm topic-btn" data-topic="modal verbs">Modal Verbs</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Ders İçeriği -->
+        <div class="col-lg-8">
+            {% if lesson_content %}
+            <div class="card shadow-sm">
+                <div class="card-header bg-success text-white">
+                    <h5 class="mb-0">
+                        <i class="bi bi-book"></i> Ders: {{ topic }}
+                        <span class="badge bg-light text-dark float-end">{{ level }}</span>
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <div class="lesson-content p-3 bg-light rounded" style="white-space: pre-line; line-height: 1.8;">
+                        {{ lesson_content }}
+                    </div>
+                </div>
+                <div class="card-footer">
+                    <a href="{{ url_for('practice_word') }}" class="btn btn-primary">
+                        <i class="bi bi-play-fill"></i> Pratik Yap
+                    </a>
+                    <a href="{{ url_for('practice_sentence') }}" class="btn btn-outline-primary">
+                        <i class="bi bi-chat-text"></i> Cümle Pratiği
+                    </a>
+                </div>
+            </div>
+            {% else %}
+            <div class="card shadow-sm">
+                <div class="card-body text-center py-5">
+                    <i class="bi bi-lightbulb display-1 text-muted"></i>
+                    <h4 class="mt-3 text-muted">Henüz ders oluşturulmadı</h4>
+                    <p class="text-muted">Soldaki formdan bir konu seç ve "Ders Oluştur" butonuna tıkla</p>
+                </div>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+
+    <div class="row mt-4">
+        <div class="col-12">
+            <a href="{{ url_for('dashboard') }}" class="btn btn-secondary">
+                <i class="bi bi-arrow-left"></i> Dashboard'a Dön
+            </a>
+        </div>
+    </div>
+</div>
+
+<script>
+// Popüler konu butonları
+document.querySelectorAll('.topic-btn').forEach(btn => {
+    btn.addEventListener('click', function() {
+        document.getElementById('topic').value = this.dataset.topic;
+    });
+});
+
+// Form submit loading
+document.querySelector('form').addEventListener('submit', function() {
+    const btn = document.getElementById('submitBtn');
+    btn.disabled = true;
+    btn.innerHTML = '<span class="spinner-border spinner-border-sm" role="status"></span> AI ders oluşturuyor...';
+});
+</script>
+{% endblock %}
