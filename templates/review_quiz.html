@@ -1,39 +1,800 @@
 {% extends 'base.html' %}
 
 {% block content %}
-<h2>Tekrar Quizleri</h2>
-<p>Burada daha önce yaptığınız hataları tekrar edebilirsiniz.</p>
+<style>
+  .quiz-container {
+    max-width: 600px;
+    margin: 30px auto;
+    padding: 20px;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    border-radius: 12px;
+    color: white;
+  }
+  
+  .quiz-header {
+    text-align: center;
+    margin-bottom: 30px;
+  }
+  
+  .quiz-title {
+    font-size: 28px;
+    font-weight: bold;
+    margin-bottom: 10px;
+  }
+  
+  .quiz-progress {
+    background: rgba(255, 255, 255, 0.3);
+    border-radius: 8px;
+    height: 8px;
+    margin: 15px 0;
+    overflow: hidden;
+  }
+  
+  .quiz-progress-bar {
+    height: 100%;
+    background: #4ade80;
+    transition: width 0.3s ease;
+  }
+  
+  .quiz-stats {
+    display: flex;
+    justify-content: space-around;
+    margin-top: 10px;
+    font-size: 14px;
+  }
+  
+  .quiz-question-card {
+    background: white;
+    color: #333;
+    border-radius: 12px;
+    padding: 30px;
+    margin-bottom: 20px;
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+  }
+  
+  .quiz-context {
+    font-size: 12px;
+    color: #999;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    margin-bottom: 10px;
+  }
+  
+  .quiz-prompt {
+    font-size: 18px;
+    font-weight: 600;
+    color: #333;
+    margin: 15px 0 25px 0;
+    line-height: 1.5;
+  }
+  
+  .quiz-options {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+  
+  .quiz-option {
+    padding: 12px 16px;
+    border: 2px solid #ddd;
+    border-radius: 8px;
+    background: white;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    font-size: 15px;
+  }
+  
+  .quiz-option:hover {
+    border-color: #667eea;
+    background: #f0f4ff;
+  }
+  
+  .quiz-option.correct {
+    border-color: #4ade80;
+    background: #f0fdf4;
+    color: #16a34a;
+  }
+  
+  .quiz-option.incorrect {
+    border-color: #ef4444;
+    background: #fef2f2;
+    color: #dc2626;
+  }
+  
+  .quiz-feedback {
+    margin-top: 20px;
+    padding: 15px;
+    border-radius: 8px;
+    font-size: 14px;
+    display: none;
+  }
+  
+  .quiz-feedback.correct {
+    background: #f0fdf4;
+    color: #16a34a;
+    border-left: 4px solid #4ade80;
+    display: block;
+  }
+  
+  .quiz-feedback.incorrect {
+    background: #fef2f2;
+    color: #dc2626;
+    border-left: 4px solid #ef4444;
+    display: block;
+  }
+  
+  .quiz-buttons {
+    display: flex;
+    gap: 10px;
+    margin-top: 20px;
+  }
+  
+  .quiz-btn-next {
+    flex: 1;
+    padding: 12px;
+    border: none;
+    border-radius: 8px;
+    background: #667eea;
+    color: white;
+    font-size: 15px;
+    font-weight: 600;
+    cursor: pointer;
+    display: none;
+    transition: all 0.2s ease;
+  }
+  
+  .quiz-btn-next:hover {
+    background: #5568d3;
+  }
+  
+  .quiz-btn-next.show {
+    display: block;
+  }
+  
+  .quiz-completion {
+    text-align: center;
+    padding: 40px 20px;
+    display: none;
+  }
+  
+  .quiz-completion.show {
+    display: block;
+  }
+  
+  .quiz-completion-icon {
+    font-size: 60px;
+    margin-bottom: 20px;
+  }
+  
+  .quiz-completion-title {
+    font-size: 28px;
+    font-weight: bold;
+    margin-bottom: 10px;
+  }
+  
+  .quiz-completion-stats {
+    margin: 20px 0;
+    font-size: 16px;
+  }
+  
+  .quiz-completion-btn {
+    margin-top: 20px;
+    padding: 12px 30px;
+    background: #667eea;
+    color: white;
+    border: none;
+    border-radius: 8px;
+    font-size: 16px;
+    font-weight: 600;
+    cursor: pointer;
+    text-decoration: none;
+    display: inline-block;
+  }
+  
+  .quiz-empty {
+    text-align: center;
+    padding: 40px;
+    background: white;
+    border-radius: 12px;
+    color: #666;
+  }
+  
+  .quiz-empty-icon {
+    font-size: 48px;
+    margin-bottom: 15px;
+  }
+  
+  /* Pronunciation styles */
+  .pronunciation-area {
+    text-align: center;
+    padding: 20px;
+  }
+  
+  .target-word {
+    font-size: 32px;
+    font-weight: bold;
+    color: #667eea;
+    margin: 20px 0;
+  }
+  
+  .listen-btn {
+    background: #f0f4ff;
+    border: 2px solid #667eea;
+    color: #667eea;
+    padding: 10px 20px;
+    border-radius: 8px;
+    cursor: pointer;
+    font-size: 14px;
+    margin-bottom: 20px;
+  }
+  
+  .listen-btn:hover {
+    background: #667eea;
+    color: white;
+  }
+  
+  .record-btn {
+    width: 80px;
+    height: 80px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, #ef4444, #dc2626);
+    border: none;
+    color: white;
+    font-size: 32px;
+    cursor: pointer;
+    box-shadow: 0 4px 15px rgba(239, 68, 68, 0.4);
+    transition: all 0.2s ease;
+  }
+  
+  .record-btn:hover {
+    transform: scale(1.05);
+  }
+  
+  .record-btn.recording {
+    animation: pulse 1s infinite;
+    background: linear-gradient(135deg, #dc2626, #b91c1c);
+  }
+  
+  @keyframes pulse {
+    0%, 100% { transform: scale(1); }
+    50% { transform: scale(1.1); }
+  }
+  
+  .record-hint {
+    font-size: 13px;
+    color: #666;
+    margin-top: 15px;
+  }
+  
+  .pronunciation-result {
+    margin-top: 20px;
+    padding: 15px;
+    border-radius: 8px;
+    display: none;
+  }
+  
+  .pronunciation-result.show {
+    display: block;
+  }
+  
+  .pronunciation-result.correct {
+    background: #f0fdf4;
+    border-left: 4px solid #4ade80;
+  }
+  
+  .pronunciation-result.incorrect {
+    background: #fef2f2;
+    border-left: 4px solid #ef4444;
+  }
+  
+  /* Sentence/Grammar styles */
+  .sentence-area {
+    padding: 10px 0;
+  }
+  
+  .sentence-input {
+    width: 100%;
+    padding: 12px;
+    border: 2px solid #ddd;
+    border-radius: 8px;
+    font-size: 15px;
+    min-height: 60px;
+    resize: vertical;
+  }
+  
+  .sentence-input:focus {
+    outline: none;
+    border-color: #667eea;
+  }
+  
+  .grammar-result {
+    margin-top: 15px;
+    padding: 15px;
+    border-radius: 8px;
+    display: none;
+  }
+  
+  .grammar-result.show {
+    display: block;
+  }
+  
+  .corrected-sentence {
+    font-style: italic;
+    color: #16a34a;
+    margin: 10px 0;
+    padding: 10px;
+    background: #f0fdf4;
+    border-radius: 6px;
+  }
+  
+  .grammar-mistakes {
+    margin-top: 10px;
+  }
+  
+  .grammar-mistake-item {
+    background: #fff3e0;
+    padding: 8px 12px;
+    border-radius: 6px;
+    margin-bottom: 8px;
+    font-size: 13px;
+  }
+</style>
 
-{% if not quiz_items %}
-  <p>Şu anda tekrar için gelen bir öğe yok.</p>
-{% else %}
-  <ul>
-  {% for it in quiz_items %}
-    <li style="margin-bottom:18px; padding:10px; border:1px solid #ddd;">
-      <strong>{{ it.item_key }}</strong> — <em>{{ it.context }}</em>
-      <div style="margin-top:6px;">{{ it.prompt }}</div>
-      <div style="margin-top:8px; color:#666;">Son görülme: {{ it.meta.last_seen }}</div>
-
-      <form method="post" action="{{ url_for('review_submit') }}" style="margin-top:8px;">
-        <input type="hidden" name="mistake_id" value="{{ it.mistake_id }}" />
-        <input type="hidden" name="item_key" value="{{ it.item_key }}" />
-
-        <label>Değerlendirme (0-5):</label>
-        <select name="quality">
-          <option value="5">5 — Çok iyi</option>
-          <option value="4">4 — İyi</option>
-          <option value="3">3 — Kabul edilir</option>
-          <option value="2">2 — Zayıf</option>
-          <option value="1">1 — Çok zayıf</option>
-          <option value="0">0 — Yanlış</option>
-        </select>
-        <button type="submit">Kaydet</button>
-      </form>
-
-      <div style="margin-top:6px; color:#444;">Doğru cevap: <strong>{{ it.correct_answer or '—' }}</strong></div>
-    </li>
-  {% endfor %}
-  </ul>
-{% endif %}
+<div class="quiz-container">
+  {% if quiz_items %}
+  <div class="quiz-header">
+    <div class="quiz-title">🎯 Hatalarımı Düzelt</div>
+    <p style="margin: 10px 0 0 0; font-size: 14px; opacity: 0.9;">Daha önce yaptığın hataları tekrar et ve öğren</p>
+    
+    <div class="quiz-progress">
+      <div class="quiz-progress-bar" id="progressBar" style="width: 0%"></div>
+    </div>
+    
+    <div class="quiz-stats">
+      <div>Soru <span id="currentQuestion">1</span> / <span id="totalQuestions">{{ quiz_items|length }}</span></div>
+      <div>✓ <span id="correctCount">0</span> Doğru</div>
+      <div>✗ <span id="incorrectCount">0</span> Yanlış</div>
+    </div>
+  </div>
+  
+  <div id="quizContent"></div>
+  
+  <div class="quiz-completion" id="completion">
+    <div class="quiz-completion-icon" id="completionIcon"></div>
+    <div class="quiz-completion-title" id="completionTitle"></div>
+    <div class="quiz-completion-stats" id="completionStats"></div>
+    <a href="/review" class="quiz-completion-btn">Daha Fazla Soru</a>
+    <a href="/my-mistakes" class="quiz-completion-btn" style="background: #764ba2; margin-left: 10px;">Tüm Hatalarım</a>
+  </div>
+  
+  <script>
+    const quizData = {{ quiz_items|tojson }};
+    let currentIndex = 0;
+    let correctCount = 0;
+    let incorrectCount = 0;
+    let answered = false;
+    
+    function renderQuestion() {
+      if (currentIndex >= quizData.length) {
+        showCompletion();
+        return;
+      }
+      
+      const item = quizData[currentIndex];
+      const progress = ((currentIndex + 1) / quizData.length) * 100;
+      
+      document.getElementById('progressBar').style.width = progress + '%';
+      document.getElementById('currentQuestion').textContent = currentIndex + 1;
+      
+      const contextLabel = {
+        'pronunciation': '🎤 Telaffuz',
+        'sentence': '✍️ Gramer/Cümle',
+        'word': '📖 Kelime'
+      };
+      
+      let contentHTML = '';
+      let buttonsHTML = '';
+      
+      if (item.context === 'pronunciation') {
+        // TELAFFUZ SORUSU - Mikrofon ile
+        contentHTML = `
+          <div class="pronunciation-area">
+            <p style="color: #666; margin-bottom: 10px;">Bu kelimeyi doğru telaffuz et:</p>
+            <div class="target-word">${item.item_key}</div>
+            <button class="listen-btn" onclick="speakWord('${item.item_key}')">
+              🔊 Dinle
+            </button>
+            <div style="margin: 20px 0;">
+              <button class="record-btn" id="recordBtn" onclick="toggleRecording('${item.item_key}')">
+                🎤
+              </button>
+            </div>
+            <div class="record-hint">Mikrofona tıkla ve kelimeyi söyle</div>
+            <div class="pronunciation-result" id="pronunciationResult">
+              <div id="recognizedText"></div>
+              <div id="pronunciationScore"></div>
+            </div>
+          </div>
+        `;
+        buttonsHTML = `
+          <button class="quiz-btn-next" id="nextBtn" onclick="nextQuestion()">
+            ${currentIndex === quizData.length - 1 ? 'Tamamla' : 'Sonraki'}
+          </button>
+        `;
+      } else if (item.context === 'sentence') {
+        // GRAMER/CÜMLE SORUSU
+        contentHTML = `
+          <div class="sentence-area">
+            <p style="color: #666; margin-bottom: 15px;">
+              <strong>"${item.item_key}"</strong> kelimesini kullanarak doğru bir İngilizce cümle yaz:
+            </p>
+            <p style="color: #999; font-size: 13px; margin-bottom: 10px;">
+              Önceki hatan: <span style="color: #ef4444;">"${item.wrong_example || '-'}"</span>
+            </p>
+            <textarea class="sentence-input" id="sentenceInput" placeholder="Cümlenizi buraya yazın..."></textarea>
+            <div class="grammar-result" id="grammarResult">
+              <div id="grammarFeedback"></div>
+            </div>
+          </div>
+        `;
+        buttonsHTML = `
+          <button class="quiz-btn-next show" id="checkGrammarBtn" onclick="checkGrammar('${item.item_key}')">
+            ✓ Kontrol Et
+          </button>
+          <button class="quiz-btn-next" id="nextBtn" onclick="nextQuestion()">
+            ${currentIndex === quizData.length - 1 ? 'Tamamla' : 'Sonraki'}
+          </button>
+        `;
+      } else {
+        // KELİME SORUSU - Çoktan seçmeli
+        const options = shuffleArray([
+          { text: item.correct_answer, isCorrect: true },
+          { text: item.wrong_example || 'Yanlış seçenek', isCorrect: false }
+        ]);
+        
+        contentHTML = `
+          <p style="color: #666; margin-bottom: 15px;">Doğru cevabı seç:</p>
+          <div class="quiz-options" id="options">
+            ${options.map((opt, idx) => `
+              <div class="quiz-option" onclick="selectWordOption(${idx}, ${opt.isCorrect}, '${item.correct_answer}')">
+                ${opt.text}
+              </div>
+            `).join('')}
+          </div>
+        `;
+        buttonsHTML = `
+          <button class="quiz-btn-next" id="nextBtn" onclick="nextQuestion()">
+            ${currentIndex === quizData.length - 1 ? 'Tamamla' : 'Sonraki'}
+          </button>
+        `;
+      }
+      
+      const html = `
+        <div class="quiz-question-card">
+          <div class="quiz-context">${contextLabel[item.context] || '📝 Soru'}</div>
+          <div class="quiz-prompt">${item.prompt}</div>
+          ${contentHTML}
+          <div class="quiz-feedback" id="feedback"></div>
+          <div class="quiz-buttons">
+            ${buttonsHTML}
+          </div>
+        </div>
+      `;
+      
+      document.getElementById('quizContent').innerHTML = html;
+      answered = false;
+    }
+    
+    function shuffleArray(array) {
+      const arr = [...array];
+      for (let i = arr.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [arr[i], arr[j]] = [arr[j], arr[i]];
+      }
+      return arr;
+    }
+    
+    function selectWordOption(optionIndex, isCorrect, correctAnswer) {
+      if (answered) return;
+      answered = true;
+      
+      const options = document.querySelectorAll('.quiz-option');
+      options.forEach((opt, idx) => {
+        if (idx === optionIndex) {
+          opt.classList.add(isCorrect ? 'correct' : 'incorrect');
+        }
+        opt.style.cursor = 'default';
+        opt.onclick = null;
+      });
+      
+      const feedback = document.getElementById('feedback');
+      if (isCorrect) {
+        correctCount++;
+        feedback.textContent = '✓ Doğru! Harika iş.';
+        feedback.classList.add('correct');
+      } else {
+        incorrectCount++;
+        feedback.textContent = `✗ Yanlış. Doğru cevap: ${correctAnswer}`;
+        feedback.classList.add('incorrect');
+      }
+      
+      document.getElementById('correctCount').textContent = correctCount;
+      document.getElementById('incorrectCount').textContent = incorrectCount;
+      document.getElementById('nextBtn').classList.add('show');
+      
+      submitAnswer(correctAnswer, isCorrect);
+    }
+    
+    // TELAFFUZ FONKSİYONLARI
+    let recognition = null;
+    let isRecording = false;
+    
+    function speakWord(word) {
+      const utterance = new SpeechSynthesisUtterance(word);
+      utterance.lang = 'en-US';
+      utterance.rate = 0.8;
+      speechSynthesis.speak(utterance);
+    }
+    
+    function toggleRecording(targetWord) {
+      if (!('webkitSpeechRecognition' in window) && !('SpeechRecognition' in window)) {
+        alert('Tarayıcınız ses tanımayı desteklemiyor. Chrome kullanmayı deneyin.');
+        return;
+      }
+      
+      const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+      const recordBtn = document.getElementById('recordBtn');
+      
+      if (isRecording) {
+        recognition.stop();
+        isRecording = false;
+        recordBtn.classList.remove('recording');
+        recordBtn.textContent = '🎤';
+        return;
+      }
+      
+      recognition = new SpeechRecognition();
+      recognition.lang = 'en-US';
+      recognition.interimResults = false;
+      recognition.maxAlternatives = 1;
+      
+      recognition.onstart = function() {
+        isRecording = true;
+        recordBtn.classList.add('recording');
+        recordBtn.textContent = '⏹️';
+      };
+      
+      recognition.onresult = function(event) {
+        const recognized = event.results[0][0].transcript.toLowerCase().trim();
+        const target = targetWord.toLowerCase().trim();
+        const confidence = event.results[0][0].confidence;
+        
+        checkPronunciation(recognized, target, confidence);
+      };
+      
+      recognition.onerror = function(event) {
+        console.error('Speech recognition error:', event.error);
+        isRecording = false;
+        recordBtn.classList.remove('recording');
+        recordBtn.textContent = '🎤';
+        
+        const resultDiv = document.getElementById('pronunciationResult');
+        resultDiv.classList.add('show', 'incorrect');
+        document.getElementById('recognizedText').innerHTML = `
+          <p style="color: #ef4444;">❌ Ses algılanamadı. Tekrar deneyin.</p>
+        `;
+      };
+      
+      recognition.onend = function() {
+        isRecording = false;
+        recordBtn.classList.remove('recording');
+        recordBtn.textContent = '🎤';
+      };
+      
+      recognition.start();
+    }
+    
+    function checkPronunciation(recognized, target, confidence) {
+      const resultDiv = document.getElementById('pronunciationResult');
+      resultDiv.classList.add('show');
+      
+      // Basit karşılaştırma
+      const isCorrect = recognized.includes(target) || target.includes(recognized) || 
+                        levenshteinDistance(recognized, target) <= 2;
+      
+      const score = Math.round(confidence * 100);
+      
+      if (isCorrect && score >= 60) {
+        resultDiv.classList.add('correct');
+        resultDiv.classList.remove('incorrect');
+        correctCount++;
+        document.getElementById('recognizedText').innerHTML = `
+          <p style="color: #16a34a; font-weight: 600;">✓ Harika telaffuz!</p>
+          <p>Algılanan: "${recognized}"</p>
+        `;
+        document.getElementById('pronunciationScore').innerHTML = `
+          <p style="margin-top: 10px;">Güven skoru: %${score}</p>
+        `;
+      } else {
+        resultDiv.classList.add('incorrect');
+        resultDiv.classList.remove('correct');
+        incorrectCount++;
+        document.getElementById('recognizedText').innerHTML = `
+          <p style="color: #dc2626; font-weight: 600;">✗ Tekrar dene</p>
+          <p>Algılanan: "${recognized}"</p>
+          <p>Hedef: "${target}"</p>
+        `;
+        document.getElementById('pronunciationScore').innerHTML = `
+          <p style="margin-top: 10px;">Güven skoru: %${score}</p>
+        `;
+      }
+      
+      answered = true;
+      document.getElementById('correctCount').textContent = correctCount;
+      document.getElementById('incorrectCount').textContent = incorrectCount;
+      document.getElementById('nextBtn').classList.add('show');
+      
+      submitAnswer(target, isCorrect && score >= 60);
+    }
+    
+    function levenshteinDistance(a, b) {
+      const matrix = [];
+      for (let i = 0; i <= b.length; i++) {
+        matrix[i] = [i];
+      }
+      for (let j = 0; j <= a.length; j++) {
+        matrix[0][j] = j;
+      }
+      for (let i = 1; i <= b.length; i++) {
+        for (let j = 1; j <= a.length; j++) {
+          if (b.charAt(i - 1) === a.charAt(j - 1)) {
+            matrix[i][j] = matrix[i - 1][j - 1];
+          } else {
+            matrix[i][j] = Math.min(
+              matrix[i - 1][j - 1] + 1,
+              matrix[i][j - 1] + 1,
+              matrix[i - 1][j] + 1
+            );
+          }
+        }
+      }
+      return matrix[b.length][a.length];
+    }
+    
+    // GRAMER/CÜMLE FONKSİYONLARI
+    async function checkGrammar(targetWord) {
+      const input = document.getElementById('sentenceInput');
+      const sentence = input.value.trim();
+      
+      if (!sentence) {
+        alert('Lütfen bir cümle yazın!');
+        return;
+      }
+      
+      // Hedef kelimeyi içeriyor mu kontrol et
+      if (!sentence.toLowerCase().includes(targetWord.toLowerCase())) {
+        const feedback = document.getElementById('feedback');
+        feedback.textContent = `⚠️ Cümlende "${targetWord}" kelimesini kullanmalısın!`;
+        feedback.classList.add('incorrect');
+        return;
+      }
+      
+      const checkBtn = document.getElementById('checkGrammarBtn');
+      checkBtn.textContent = '⏳ Kontrol ediliyor...';
+      checkBtn.disabled = true;
+      
+      try {
+        // Gramer kontrolü için API çağrısı
+        const response = await fetch('/api/check-grammar', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ sentence: sentence, target_word: targetWord })
+        });
+        
+        const result = await response.json();
+        
+        const grammarResult = document.getElementById('grammarResult');
+        grammarResult.classList.add('show');
+        
+        const feedback = document.getElementById('feedback');
+        const grammarFeedback = document.getElementById('grammarFeedback');
+        
+        if (result.mistakes && result.mistakes.length > 0) {
+          // Hatalar var
+          incorrectCount++;
+          feedback.textContent = '✗ Gramer hataları bulundu';
+          feedback.classList.add('incorrect');
+          
+          grammarFeedback.innerHTML = `
+            <div class="corrected-sentence">
+              <strong>Düzeltilmiş:</strong> ${result.corrected || sentence}
+            </div>
+            <div class="grammar-mistakes">
+              <strong>Hatalar:</strong>
+              ${result.mistakes.map(m => `
+                <div class="grammar-mistake-item">
+                  <strong>${m.part}:</strong> ${m.explanation_tr}
+                </div>
+              `).join('')}
+            </div>
+          `;
+        } else {
+          // Hata yok
+          correctCount++;
+          feedback.textContent = '✓ Mükemmel! Gramer hatası yok.';
+          feedback.classList.add('correct');
+          
+          grammarFeedback.innerHTML = `
+            <div class="corrected-sentence">
+              <strong>✓ Cümlen doğru:</strong> ${sentence}
+            </div>
+          `;
+        }
+        
+        answered = true;
+        document.getElementById('correctCount').textContent = correctCount;
+        document.getElementById('incorrectCount').textContent = incorrectCount;
+        
+        checkBtn.style.display = 'none';
+        document.getElementById('nextBtn').classList.add('show');
+        input.disabled = true;
+        
+        submitAnswer(sentence, result.mistakes?.length === 0);
+        
+      } catch (error) {
+        console.error('Grammar check error:', error);
+        checkBtn.textContent = '✓ Kontrol Et';
+        checkBtn.disabled = false;
+        alert('Gramer kontrolü yapılamadı. Lütfen tekrar deneyin.');
+      }
+    }
+    
+    function nextQuestion() {
+      currentIndex++;
+      renderQuestion();
+    }
+    
+    function submitAnswer(correctAnswer, isCorrect) {
+      const item = quizData[currentIndex];
+      const quality = isCorrect ? 4 : 1;
+      
+      fetch('/review/submit', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: `mistake_id=${item.mistake_id}&item_key=${encodeURIComponent(item.item_key)}&quality=${quality}`
+      }).catch(err => console.log('Submit error:', err));
+    }
+    
+    function showCompletion() {
+      document.getElementById('quizContent').style.display = 'none';
+      const completion = document.getElementById('completion');
+      completion.classList.add('show');
+      
+      const accuracy = Math.round((correctCount / quizData.length) * 100);
+      const icon = accuracy >= 70 ? '🎉' : accuracy >= 50 ? '👍' : '💪';
+      
+      document.getElementById('completionIcon').textContent = icon;
+      document.getElementById('completionTitle').textContent = 
+        accuracy >= 70 ? 'Harika!' : accuracy >= 50 ? 'İyi gidiyor!' : 'Devam et!';
+      document.getElementById('completionStats').innerHTML = `
+        <div>%${accuracy} doğru</div>
+        <div>${correctCount} / ${quizData.length} soru</div>
+      `;
+    }
+    
+    renderQuestion();
+  </script>
+  
+  {% else %}
+  <div class="quiz-empty">
+    <div class="quiz-empty-icon">📭</div>
+    <div style="font-size: 18px; font-weight: 600; margin-bottom: 10px;">Şu anda tekrar için gelen soru yok</div>
+    <p>Dersler sırasında hata yaptıkça quiz sorularınız burada görünecek!</p>
+    <a href="/practice_word" style="margin-top: 15px; padding: 10px 20px; background: #667eea; color: white; border-radius: 8px; text-decoration: none; display: inline-block;">
+      Pratik Yap
+    </a>
+  </div>
+  {% endif %}
+</div>
 
 {% endblock %}

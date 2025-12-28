@@ -12,7 +12,7 @@ import json
 
 
 class CourseManager:
-    """Kurs ve ünite yönetimine."""""
+    """Kurs ve ünite yönetimi."""
     
     def __init__(self):
         # 20 standart ünite

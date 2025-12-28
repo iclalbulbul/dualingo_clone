@@ -1,0 +1,317 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<style>
+  .mistakes-container {
+    max-width: 900px;
+    margin: 0 auto;
+  }
+
+  .mistake-card {
+    background: white;
+    border-radius: 12px;
+    padding: 20px;
+    margin-bottom: 16px;
+    border-left: 5px solid #ff6b6b;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+    transition: all 0.3s ease;
+  }
+
+  .mistake-card:hover {
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.12);
+  }
+
+  .mistake-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 12px;
+    padding-bottom: 12px;
+    border-bottom: 1px solid #eee;
+  }
+
+  .mistake-item-key {
+    font-size: 18px;
+    font-weight: 700;
+    color: #333;
+  }
+
+  .mistake-context-badge {
+    display: inline-block;
+    background: #e3f2fd;
+    color: #1976d2;
+    padding: 4px 12px;
+    border-radius: 20px;
+    font-size: 12px;
+    font-weight: 600;
+    text-transform: uppercase;
+  }
+
+  .mistake-context-badge.word {
+    background: #fff3e0;
+    color: #e65100;
+  }
+
+  .mistake-context-badge.sentence {
+    background: #f3e5f5;
+    color: #7b1fa2;
+  }
+
+  .mistake-context-badge.pronunciation {
+    background: #e0f2f1;
+    color: #00695c;
+  }
+
+  .mistake-comparison {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 16px;
+    margin-bottom: 16px;
+  }
+
+  .comparison-box {
+    padding: 12px;
+    border-radius: 8px;
+    background: #fafafa;
+  }
+
+  .comparison-box.wrong {
+    border-left: 4px solid #ff6b6b;
+  }
+
+  .comparison-box.correct {
+    border-left: 4px solid #51cf66;
+  }
+
+  .comparison-label {
+    font-size: 12px;
+    font-weight: 600;
+    color: #666;
+    text-transform: uppercase;
+    margin-bottom: 6px;
+  }
+
+  .comparison-text {
+    font-size: 16px;
+    color: #333;
+    word-break: break-word;
+    font-family: "Monaco", "Courier New", monospace;
+  }
+
+  .ai-feedback-section {
+    background: #f0f7ff;
+    border-left: 4px solid #0066cc;
+    padding: 14px;
+    border-radius: 8px;
+    margin-top: 14px;
+  }
+
+  .ai-feedback-title {
+    font-size: 13px;
+    font-weight: 700;
+    color: #0066cc;
+    text-transform: uppercase;
+    margin-bottom: 8px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+
+  .ai-feedback-title::before {
+    content: "✨";
+    font-size: 14px;
+  }
+
+  .ai-explanation {
+    font-size: 14px;
+    color: #333;
+    line-height: 1.6;
+    margin-bottom: 12px;
+  }
+
+  .ai-tips {
+    margin-bottom: 12px;
+  }
+
+  .ai-tips-title {
+    font-size: 12px;
+    font-weight: 600;
+    color: #0066cc;
+    margin-bottom: 6px;
+  }
+
+  .ai-tips ul {
+    margin: 0;
+    padding-left: 20px;
+  }
+
+  .ai-tips li {
+    font-size: 13px;
+    color: #555;
+    margin-bottom: 4px;
+    line-height: 1.5;
+  }
+
+  .ai-example {
+    background: white;
+    border-radius: 6px;
+    padding: 10px;
+    font-size: 13px;
+    color: #333;
+    margin-bottom: 10px;
+    font-style: italic;
+    border-left: 3px solid #0066cc;
+    padding-left: 10px;
+  }
+
+  .ai-practice {
+    background: white;
+    border-radius: 6px;
+    padding: 10px;
+    font-size: 13px;
+    color: #333;
+    border-left: 3px solid #51cf66;
+  }
+
+  .feedback-toggle-btn {
+    background: none;
+    border: none;
+    color: #0066cc;
+    cursor: pointer;
+    font-size: 12px;
+    text-decoration: underline;
+    padding: 0;
+    margin-top: 8px;
+  }
+
+  .feedback-toggle-btn:hover {
+    color: #004999;
+  }
+
+  .empty-state {
+    text-align: center;
+    padding: 40px 20px;
+    background: #f9f9f9;
+    border-radius: 12px;
+    margin-top: 20px;
+  }
+
+  .empty-state-icon {
+    font-size: 48px;
+    margin-bottom: 16px;
+  }
+
+  .empty-state-text {
+    font-size: 16px;
+    color: #666;
+    margin-bottom: 12px;
+  }
+
+  .empty-state-link {
+    color: #0066cc;
+    text-decoration: none;
+    font-weight: 600;
+  }
+
+  .empty-state-link:hover {
+    text-decoration: underline;
+  }
+
+  @media (max-width: 600px) {
+    .mistake-comparison {
+      grid-template-columns: 1fr;
+    }
+
+    .mistake-header {
+      flex-direction: column;
+      align-items: flex-start;
+      gap: 8px;
+    }
+  }
+</style>
+
+<div class="mistakes-container">
+  <h2>📚 Hatalarım</h2>
+  <p>Burada derslerde yaptığın hatalar listelenir. AI tarafından sağlanan geri bildirimlerle öğrenmeni hızlandırabilirsin. Her bir öğeyi tekrar etmek için <a href="/review">Tekrar Quizleri</a> sayfasını kullanabilirsin.</p>
+
+  {% if not mistakes %}
+    <div class="empty-state">
+      <div class="empty-state-icon">🎉</div>
+      <div class="empty-state-text">Henüz kayıtlı hata yok!</div>
+      <p style="color: #999; font-size: 14px;">Pratik yaptığında hatalarının burada görünecek.</p>
+      <a href="/learn" class="empty-state-link">Pratik Sayfasına Dön</a>
+    </div>
+  {% else %}
+    {% for m in mistakes %}
+      <div class="mistake-card">
+        <div class="mistake-header">
+          <div class="mistake-item-key">{{ m.item_key }}</div>
+          <span class="mistake-context-badge {{ m.context or 'sentence' }}">
+            {% if m.context == 'word' %}
+              📝 Kelime
+            {% elif m.context == 'pronunciation' %}
+              🎤 Telaffuz
+            {% else %}
+              ✍️ Cümle
+            {% endif %}
+          </span>
+        </div>
+
+        <div class="mistake-comparison">
+          <div class="comparison-box wrong">
+            <div class="comparison-label">❌ Yanlış Cevap</div>
+            <div class="comparison-text">{{ m.wrong_answer or '—' }}</div>
+          </div>
+          <div class="comparison-box correct">
+            <div class="comparison-label">✅ Doğru Cevap</div>
+            <div class="comparison-text">{{ m.correct_answer or '—' }}</div>
+          </div>
+        </div>
+
+        {% if m.get('ai_feedback') %}
+          <div class="ai-feedback-section">
+            <div class="ai-feedback-title">AI Geri Bildirimi</div>
+
+            {% if m.ai_feedback.get('explanation') %}
+              <div class="ai-explanation">
+                {{ m.ai_feedback.explanation }}
+              </div>
+            {% endif %}
+
+            {% if m.ai_feedback.get('tips') and m.ai_feedback.tips|length > 0 %}
+              <div class="ai-tips">
+                <div class="ai-tips-title">💡 İpuçları:</div>
+                <ul>
+                  {% for tip in m.ai_feedback.tips %}
+                    {% if tip %}
+                      <li>{{ tip }}</li>
+                    {% endif %}
+                  {% endfor %}
+                </ul>
+              </div>
+            {% endif %}
+
+            {% if m.ai_feedback.get('example') %}
+              <div class="ai-example">
+                <strong>Örnek:</strong> {{ m.ai_feedback.example }}
+              </div>
+            {% endif %}
+
+            {% if m.ai_feedback.get('practice_sentence') %}
+              <div class="ai-practice">
+                <strong>📝 Örnek Kullanım:</strong> 
+                <span style="font-style: italic; color: #2c5282;">"{{ m.ai_feedback.practice_sentence }}"</span>
+              </div>
+            {% endif %}
+          </div>
+        {% endif %}
+
+        <div style="font-size: 12px; color: #999; margin-top: 12px;">
+          Son görülme: {{ m.last_seen or m.created_at }}
+        </div>
+      </div>
+    {% endfor %}
+  {% endif %}
+</div>
+
+{% endblock %}

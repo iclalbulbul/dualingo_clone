@@ -12,7 +12,7 @@ Kontroller:
 """
 
 import re
-from typing import List, Dict, Tuple
+from typing import List, Dict, Tuple, Optional
 
 # ======== KURALLAR ========
 
@@ -40,6 +40,118 @@ PAST_TENSE_VERBS = {
 }
 
 COMMON_WORDS = {"the", "a", "an", "and", "or", "but", "in", "on", "at", "to", "for", "of", "with", "by", "from"}
+
+# Yaygın İngilizce kelimeler (dil tespiti için)
+COMMON_ENGLISH_WORDS = {
+    # Zamirler
+    "i", "you", "he", "she", "it", "we", "they", "me", "him", "her", "us", "them",
+    "my", "your", "his", "its", "our", "their", "mine", "yours", "hers", "ours", "theirs",
+    "this", "that", "these", "those", "who", "what", "which", "where", "when", "why", "how",
+    # Fiiller
+    "is", "am", "are", "was", "were", "be", "been", "being",
+    "have", "has", "had", "do", "does", "did", "will", "would", "could", "should", "can", "may", "might",
+    "go", "goes", "went", "gone", "come", "comes", "came", "get", "gets", "got",
+    "make", "makes", "made", "take", "takes", "took", "see", "sees", "saw", "seen",
+    "know", "knows", "knew", "known", "think", "thinks", "thought", "want", "wants", "wanted",
+    "like", "likes", "liked", "love", "loves", "loved", "need", "needs", "needed",
+    "use", "uses", "used", "find", "finds", "found", "give", "gives", "gave", "given",
+    "tell", "tells", "told", "say", "says", "said", "ask", "asks", "asked",
+    "work", "works", "worked", "try", "tries", "tried", "call", "calls", "called",
+    "feel", "feels", "felt", "become", "becomes", "became", "leave", "leaves", "left",
+    "put", "puts", "keep", "keeps", "kept", "let", "lets", "begin", "begins", "began",
+    "seem", "seems", "seemed", "help", "helps", "helped", "show", "shows", "showed",
+    "hear", "hears", "heard", "play", "plays", "played", "run", "runs", "ran",
+    "move", "moves", "moved", "live", "lives", "lived", "believe", "believes", "believed",
+    "hold", "holds", "held", "bring", "brings", "brought", "happen", "happens", "happened",
+    "write", "writes", "wrote", "written", "read", "reads", "learn", "learns", "learned",
+    "eat", "eats", "ate", "eaten", "drink", "drinks", "drank", "sleep", "sleeps", "slept",
+    "walk", "walks", "walked", "talk", "talks", "talked", "sit", "sits", "sat",
+    "stand", "stands", "stood", "open", "opens", "opened", "close", "closes", "closed",
+    "buy", "buys", "bought", "wait", "waits", "waited", "send", "sends", "sent",
+    "meet", "meets", "met", "pay", "pays", "paid", "study", "studies", "studied",
+    # Sıfatlar
+    "good", "bad", "big", "small", "new", "old", "young", "long", "short", "great",
+    "little", "own", "other", "right", "left", "high", "low", "next", "last", "first",
+    "early", "late", "important", "different", "same", "able", "best", "better", "sure",
+    "free", "true", "full", "easy", "hard", "difficult", "possible", "real", "whole",
+    "happy", "sad", "beautiful", "nice", "fine", "fast", "slow", "hot", "cold", "warm",
+    # Zarflar
+    "not", "very", "just", "also", "only", "now", "then", "still", "already", "even",
+    "well", "back", "much", "more", "most", "here", "there", "always", "never", "often",
+    "sometimes", "usually", "really", "again", "too", "so", "ever", "almost", "enough",
+    "today", "tomorrow", "yesterday", "always", "never", "perhaps", "maybe", "probably",
+    # İsimler
+    "time", "year", "people", "way", "day", "man", "woman", "child", "world", "life",
+    "hand", "part", "place", "case", "week", "company", "system", "program", "question",
+    "work", "government", "number", "night", "point", "home", "water", "room", "mother",
+    "area", "money", "story", "fact", "month", "lot", "right", "study", "book", "eye",
+    "job", "word", "business", "issue", "side", "kind", "head", "house", "service", "friend",
+    "father", "power", "hour", "game", "line", "end", "member", "law", "car", "city",
+    "community", "name", "president", "team", "minute", "idea", "kid", "body", "information",
+    "school", "family", "student", "teacher", "food", "music", "movie", "phone", "morning",
+    # Edatlar ve bağlaçlar
+    "the", "a", "an", "and", "or", "but", "if", "because", "as", "until", "while",
+    "of", "to", "in", "for", "on", "with", "at", "by", "from", "up", "about", "into",
+    "over", "after", "beneath", "under", "above", "before", "between", "through", "during",
+    # Soru kelimeleri ve diğer
+    "yes", "no", "please", "thank", "thanks", "sorry", "hello", "hi", "goodbye", "bye",
+    "ok", "okay", "well", "right", "oh", "wow", "hey", "yeah", "yep", "nope",
+}
+
+# Türkçe karakterler
+TURKISH_CHARS = set("çğıöşüÇĞİÖŞÜ")
+
+# Yaygın Türkçe kelimeler
+COMMON_TURKISH_WORDS = {
+    "ve", "bir", "bu", "için", "ile", "da", "de", "ne", "ben", "sen", "o", "biz", "siz", "onlar",
+    "var", "yok", "gibi", "daha", "çok", "ama", "veya", "ki", "olan", "olarak", "kadar", "sonra",
+    "önce", "şu", "her", "ancak", "ise", "ya", "hem", "nasıl", "neden", "nerede", "kim", "hangi",
+    "benim", "senin", "onun", "bizim", "sizin", "onların", "şey", "zaman", "gün", "yıl", "ay",
+    "evet", "hayır", "tamam", "iyi", "kötü", "güzel", "büyük", "küçük", "yeni", "eski",
+    "merhaba", "selam", "teşekkür", "teşekkürler", "lütfen", "özür", "pardon",
+}
+
+
+def check_language(sentence: str) -> Optional[Dict]:
+    """
+    Cümlenin İngilizce olup olmadığını kontrol eder.
+    Türkçe veya başka dil tespit edilirse hata döner.
+    """
+    # Türkçe karakter kontrolü
+    if any(char in sentence for char in TURKISH_CHARS):
+        return {
+            "rule": "language_error",
+            "message_tr": "Lütfen İngilizce bir cümle yazın. Türkçe karakterler tespit edildi."
+        }
+    
+    # Kelimeleri çıkar
+    words = re.findall(r"[A-Za-zçğıöşüÇĞİÖŞÜ]+", sentence.lower())
+    
+    if not words:
+        return None
+    
+    # Türkçe kelime sayısı
+    turkish_word_count = sum(1 for w in words if w in COMMON_TURKISH_WORDS)
+    
+    # İngilizce kelime sayısı
+    english_word_count = sum(1 for w in words if w in COMMON_ENGLISH_WORDS)
+    
+    # Eğer çoğunluk Türkçe ise hata ver
+    if turkish_word_count > english_word_count and turkish_word_count >= 2:
+        return {
+            "rule": "language_error",
+            "message_tr": "Bu cümle Türkçe gibi görünüyor. Lütfen İngilizce bir cümle yazın."
+        }
+    
+    # Eğer hiç İngilizce kelime yoksa ve en az 3 kelime varsa
+    if english_word_count == 0 and len(words) >= 3:
+        return {
+            "rule": "language_error", 
+            "message_tr": "Cümlede tanınan İngilizce kelime bulunamadı. Lütfen İngilizce bir cümle yazın."
+        }
+    
+    return None
+
 
 # ======== MAIN ANALYSIS ========
 
@@ -70,7 +182,28 @@ def analyze_sentence(sentence: str) -> Dict:
             "suggestions": ["Lütfen bir cümle yazın."]
         }
     
+    # DİL KONTROLÜ - Türkçe karakter veya İngilizce olmayan kelime kontrolü
+    language_check = check_language(sentence)
+    if language_check:
+        return {
+            "sentence": sentence,
+            "is_valid": False,
+            "errors": [language_check],
+            "score": 0,
+            "suggestions": ["Lütfen İngilizce bir cümle yazın."]
+        }
+    
     words = re.findall(r"[A-Za-z']+", sentence)
+    
+    # Minimum kelime kontrolü
+    if len(words) < 2:
+        return {
+            "sentence": sentence,
+            "is_valid": False,
+            "errors": [{"rule": "minimum_words", "message_tr": "Cümle en az 2 kelime içermelidir."}],
+            "score": 20,
+            "suggestions": ["En az 2 kelimelik bir cümle yazın."]
+        }
     
     # Özne-fiil uyumu
     agreement_error = check_subject_verb_agreement(sentence)
@@ -110,7 +243,7 @@ def analyze_sentence(sentence: str) -> Dict:
     }
 
 
-def check_subject_verb_agreement(sentence: str) -> Dict or None:
+def check_subject_verb_agreement(sentence: str) -> Optional[Dict]:
     """Özne-yüklem uyumunu kontrol et."""
     words_lower = sentence.rstrip(".!?").lower().split()
     

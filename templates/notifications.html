@@ -18,7 +18,7 @@
     
     <hr>
     
-    {% if notifications %}
+    {% if notifications and notifications|length > 0 %}
     <div class="list-group">
         {% for notif in notifications %}
         <div class="list-group-item {% if not notif.is_read %}bg-light{% endif %}">

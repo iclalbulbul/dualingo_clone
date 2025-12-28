@@ -6,7 +6,7 @@ user_stats, goals ve leaderboard'dan tetiklenir.
 """
 
 from db_utils import get_db_connection
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import Dict, List, Any, Optional
 import json
 
@@ -66,6 +66,7 @@ class NotificationManager:
                 )
             """)
             
+            print(f"[DEBUG] create_notification: user_id={user_id}, type={notification_type}, title={title}, message={message}, icon={icon}, action_url={action_url}, metadata={metadata}")
             metadata_json = json.dumps(metadata) if metadata else None
             
             cursor.execute("""
@@ -469,8 +470,6 @@ class NotificationManager:
 # ==================== KULLANIM ÖRNEKLERİ ====================
 
 if __name__ == "__main__":
-    from datetime import timedelta
-    
     notif_mgr = NotificationManager()
     
     # Bildirim oluştur

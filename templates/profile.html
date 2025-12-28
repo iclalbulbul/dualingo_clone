@@ -148,4 +148,48 @@
     </div>
     {% endif %}
 </div>
+
+<script>
+// Arkadaş ekleme formu
+document.addEventListener('DOMContentLoaded', function() {
+    const form = document.querySelector('form[action*="add_friend"]');
+    if (form) {
+        form.addEventListener('submit', function(e) {
+            e.preventDefault();
+            
+            const button = form.querySelector('button[type="submit"]');
+            const originalText = button.textContent;
+            button.disabled = true;
+            button.textContent = 'Gönderiliyor...';
+            
+            fetch(form.action, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                }
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    button.classList.remove('btn-primary');
+                    button.classList.add('btn-success');
+                    button.textContent = '✓ İstek Gönderildi';
+                    button.disabled = true;
+                    alert(data.message);
+                } else {
+                    alert(data.message);
+                    button.disabled = false;
+                    button.textContent = originalText;
+                }
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                alert('Bir hata oluştu!');
+                button.disabled = false;
+                button.textContent = originalText;
+            });
+        });
+    }
+});
+</script>
 {% endblock %}

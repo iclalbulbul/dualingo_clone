@@ -1,0 +1,1269 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<style>
+  .placement-container {
+    max-width: 600px;
+    margin: 0 auto;
+    padding: 20px;
+    padding-bottom: 120px;
+    min-height: 100vh;
+  }
+  
+  /* Baslangic Ekrani */
+  .placement-intro {
+    text-align: center;
+    padding: 40px 20px;
+  }
+  
+  .placement-intro-icon {
+    font-size: 80px;
+    margin-bottom: 20px;
+  }
+  
+  .placement-intro h1 {
+    font-size: 28px;
+    color: #1cb0f6;
+    margin-bottom: 15px;
+  }
+  
+  .placement-intro p {
+    color: #666;
+    font-size: 16px;
+    line-height: 1.6;
+    margin-bottom: 30px;
+  }
+  
+  .test-info {
+    background: #f7f7f7;
+    border-radius: 16px;
+    padding: 20px;
+    margin: 20px 0;
+    text-align: left;
+  }
+  
+  .test-info h3 {
+    margin: 0 0 15px 0;
+    color: #333;
+    font-size: 16px;
+  }
+  
+  .test-info-item {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 10px 0;
+    border-bottom: 1px solid #eee;
+  }
+  
+  .test-info-item:last-child {
+    border-bottom: none;
+  }
+  
+  .test-info-icon {
+    font-size: 24px;
+  }
+  
+  .test-info-text {
+    font-size: 14px;
+    color: #555;
+  }
+  
+  .placement-levels {
+    display: flex;
+    justify-content: center;
+    gap: 10px;
+    margin: 25px 0;
+    flex-wrap: wrap;
+  }
+  
+  .level-badge {
+    padding: 8px 16px;
+    border-radius: 20px;
+    font-weight: 700;
+    font-size: 13px;
+  }
+  
+  .level-a1 { background: #e8f5e9; color: #2e7d32; }
+  .level-a2 { background: #e3f2fd; color: #1565c0; }
+  .level-b1 { background: #fff3e0; color: #ef6c00; }
+  .level-b2 { background: #fce4ec; color: #c2185b; }
+  
+  .btn-start-test {
+    padding: 18px 50px;
+    font-size: 18px;
+    font-weight: 700;
+    background: linear-gradient(135deg, #58cc02, #46a302);
+    color: white;
+    border: none;
+    border-radius: 16px;
+    cursor: pointer;
+    transition: all 0.3s;
+    box-shadow: 0 4px 15px rgba(88, 204, 2, 0.3);
+  }
+  
+  .btn-start-test:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 20px rgba(88, 204, 2, 0.4);
+  }
+  
+  .btn-skip-test {
+    display: block;
+    margin: 20px auto 0;
+    padding: 12px 30px;
+    background: transparent;
+    border: 2px solid #ddd;
+    border-radius: 12px;
+    color: #888;
+    cursor: pointer;
+    font-size: 14px;
+  }
+  
+  .btn-skip-test:hover {
+    border-color: #1cb0f6;
+    color: #1cb0f6;
+  }
+  
+  /* Quiz Ekrani */
+  .quiz-area {
+    display: none;
+  }
+  
+  .quiz-header {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    padding: 20px;
+    border-radius: 16px;
+    color: white;
+    margin-bottom: 20px;
+  }
+  
+  .quiz-title {
+    font-size: 18px;
+    font-weight: 700;
+    margin-bottom: 15px;
+    text-align: center;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+  }
+  
+  .question-type-badge {
+    background: rgba(255,255,255,0.2);
+    padding: 4px 10px;
+    border-radius: 12px;
+    font-size: 12px;
+  }
+  
+  .quiz-progress {
+    background: rgba(255,255,255,0.3);
+    border-radius: 10px;
+    height: 10px;
+    overflow: hidden;
+  }
+  
+  .quiz-progress-bar {
+    height: 100%;
+    background: #4ade80;
+    transition: width 0.3s ease;
+    border-radius: 10px;
+  }
+  
+  .quiz-stats {
+    display: flex;
+    justify-content: space-between;
+    margin-top: 12px;
+    font-size: 14px;
+  }
+  
+  .question-card {
+    background: white;
+    border-radius: 16px;
+    padding: 30px;
+    box-shadow: 0 4px 20px rgba(0,0,0,0.08);
+    margin-bottom: 20px;
+  }
+  
+  .question-label {
+    font-size: 14px;
+    color: #888;
+    margin-bottom: 10px;
+  }
+  
+  .question-text {
+    font-size: 24px;
+    font-weight: 700;
+    color: #333;
+    margin-bottom: 25px;
+  }
+  
+  /* Dinleme Butonu */
+  .listen-area {
+    text-align: center;
+    margin-bottom: 20px;
+  }
+  
+  .listen-btn {
+    width: 100px;
+    height: 100px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, #1cb0f6, #0095d9);
+    border: none;
+    cursor: pointer;
+    font-size: 48px;
+    color: white;
+    box-shadow: 0 6px 20px rgba(28, 176, 246, 0.4);
+    transition: all 0.2s;
+  }
+  
+  .listen-btn:hover {
+    transform: scale(1.05);
+  }
+  
+  .listen-hint {
+    margin-top: 15px;
+    color: #888;
+    font-size: 14px;
+  }
+  
+  /* Secenekler */
+  .options-list {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+  }
+  
+  .option-btn {
+    padding: 16px 20px;
+    border: 2px solid #e0e0e0;
+    border-radius: 12px;
+    background: white;
+    cursor: pointer;
+    font-size: 16px;
+    text-align: left;
+    transition: all 0.2s;
+  }
+  
+  .option-btn:hover:not(:disabled) {
+    border-color: #1cb0f6;
+    background: #f0f9ff;
+  }
+  
+  .option-btn.selected {
+    border-color: #1cb0f6;
+    background: #e0f2fe;
+  }
+  
+  .option-btn.correct {
+    border-color: #22c55e;
+    background: #dcfce7;
+    color: #166534;
+  }
+  
+  .option-btn.wrong {
+    border-color: #ef4444;
+    background: #fee2e2;
+    color: #991b1b;
+  }
+  
+  .option-btn:disabled {
+    cursor: not-allowed;
+  }
+  
+  /* Yazma Alani */
+  .grammar-area {
+    display: none;
+  }
+  
+  .grammar-textarea {
+    width: 100%;
+    padding: 16px;
+    border: 2px solid #e0e0e0;
+    border-radius: 12px;
+    font-size: 16px;
+    resize: none;
+    min-height: 100px;
+    transition: border-color 0.2s;
+    box-sizing: border-box;
+  }
+  
+  .grammar-textarea:focus {
+    outline: none;
+    border-color: #1cb0f6;
+  }
+  
+  .grammar-hint {
+    margin-top: 10px;
+    padding: 12px;
+    background: #f0f9ff;
+    border-radius: 8px;
+    font-size: 14px;
+    color: #0369a1;
+  }
+  
+  /* Feedback */
+  .feedback-area {
+    display: none;
+    margin-top: 15px;
+    padding: 15px;
+    border-radius: 12px;
+    font-size: 15px;
+  }
+  
+  .feedback-area.correct {
+    display: block;
+    background: #dcfce7;
+    color: #166534;
+    border-left: 4px solid #22c55e;
+  }
+  
+  .feedback-area.wrong {
+    display: block;
+    background: #fee2e2;
+    color: #991b1b;
+    border-left: 4px solid #ef4444;
+  }
+  
+  /* Alt Buton Paneli */
+  .action-panel {
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    background: white;
+    padding: 15px 20px;
+    box-shadow: 0 -4px 20px rgba(0,0,0,0.1);
+    z-index: 100;
+  }
+  
+  .action-panel .btn-next {
+    display: block;
+    width: 100%;
+    max-width: 560px;
+    margin: 0 auto;
+    padding: 18px;
+    font-size: 18px;
+    font-weight: 700;
+    border: none;
+    border-radius: 14px;
+    cursor: pointer;
+    transition: all 0.2s;
+  }
+  
+  .btn-next:disabled {
+    background: #e0e0e0;
+    color: #999;
+    cursor: not-allowed;
+  }
+  
+  .btn-next:not(:disabled) {
+    background: #58cc02;
+    color: white;
+  }
+  
+  .btn-next:not(:disabled):hover {
+    background: #46a302;
+  }
+  
+  /* Sonuc Ekrani */
+  .result-area {
+    display: none;
+    text-align: center;
+    padding: 40px 20px;
+  }
+  
+  .result-icon {
+    font-size: 100px;
+    margin-bottom: 20px;
+  }
+  
+  .result-title {
+    font-size: 28px;
+    font-weight: 700;
+    color: #333;
+    margin-bottom: 10px;
+  }
+  
+  .result-level {
+    font-size: 56px;
+    font-weight: 800;
+    background: linear-gradient(135deg, #667eea, #764ba2);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+    margin: 20px 0;
+  }
+  
+  .result-description {
+    color: #666;
+    font-size: 16px;
+    line-height: 1.6;
+    margin-bottom: 30px;
+  }
+  
+  .result-stats {
+    display: flex;
+    justify-content: center;
+    gap: 30px;
+    margin: 30px 0;
+    flex-wrap: wrap;
+  }
+  
+  .stat-box {
+    text-align: center;
+    min-width: 80px;
+  }
+  
+  .stat-value {
+    font-size: 32px;
+    font-weight: 700;
+    color: #1cb0f6;
+  }
+  
+  .stat-label {
+    font-size: 14px;
+    color: #888;
+  }
+  
+  /* Detayli Sonuclar */
+  .result-details {
+    background: #f7f7f7;
+    border-radius: 16px;
+    padding: 20px;
+    margin: 20px 0;
+    text-align: left;
+  }
+  
+  .result-details h4 {
+    margin: 0 0 15px 0;
+    color: #333;
+  }
+  
+  .level-result {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 10px 0;
+    border-bottom: 1px solid #eee;
+  }
+  
+  .level-result:last-child {
+    border-bottom: none;
+  }
+  
+  .level-name {
+    font-weight: 600;
+    color: #333;
+    min-width: 30px;
+  }
+  
+  .level-score {
+    font-size: 14px;
+    color: #666;
+    min-width: 40px;
+    text-align: right;
+  }
+  
+  .level-bar {
+    flex: 1;
+    height: 8px;
+    background: #e0e0e0;
+    border-radius: 4px;
+    margin: 0 15px;
+    overflow: hidden;
+  }
+  
+  .level-bar-fill {
+    height: 100%;
+    border-radius: 4px;
+    transition: width 0.5s ease;
+  }
+  
+  .level-bar-fill.good { background: #22c55e; }
+  .level-bar-fill.medium { background: #f59e0b; }
+  .level-bar-fill.low { background: #ef4444; }
+  
+  .btn-start-learning {
+    padding: 18px 60px;
+    font-size: 18px;
+    font-weight: 700;
+    background: linear-gradient(135deg, #1cb0f6, #0095d9);
+    color: white;
+    border: none;
+    border-radius: 16px;
+    cursor: pointer;
+    transition: all 0.3s;
+  }
+  
+  .btn-start-learning:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 20px rgba(28, 176, 246, 0.4);
+  }
+  
+  /* Telaffuz Alani */
+  .pronunciation-area {
+    display: none;
+    text-align: center;
+    padding: 20px;
+  }
+  
+  .pronunciation-word {
+    font-size: 32px;
+    font-weight: 700;
+    color: #333;
+    margin-bottom: 20px;
+  }
+  
+  .pronunciation-hint {
+    color: #888;
+    font-size: 14px;
+    margin-bottom: 15px;
+  }
+  
+  .listen-word-btn {
+    background: #e0f2fe;
+    border: none;
+    padding: 10px 20px;
+    border-radius: 20px;
+    color: #0369a1;
+    cursor: pointer;
+    font-size: 14px;
+    margin-bottom: 20px;
+  }
+  
+  .record-btn {
+    width: 100px;
+    height: 100px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, #ef4444, #dc2626);
+    border: none;
+    cursor: pointer;
+    font-size: 48px;
+    color: white;
+    box-shadow: 0 6px 20px rgba(239, 68, 68, 0.4);
+    transition: all 0.2s;
+    margin: 20px auto;
+    display: block;
+  }
+  
+  .record-btn:hover {
+    transform: scale(1.05);
+  }
+  
+  .record-btn.recording {
+    animation: pulse 1s infinite;
+    background: linear-gradient(135deg, #dc2626, #b91c1c);
+  }
+  
+  @keyframes pulse {
+    0% { box-shadow: 0 0 0 0 rgba(220, 53, 69, 0.7); }
+    70% { box-shadow: 0 0 0 20px rgba(220, 53, 69, 0); }
+    100% { box-shadow: 0 0 0 0 rgba(220, 53, 69, 0); }
+  }
+  
+  .record-status {
+    font-size: 14px;
+    color: #888;
+    margin-top: 10px;
+  }
+  
+  .record-status.listening {
+    color: #ef4444;
+    font-weight: 600;
+  }
+  
+  .audio-wave {
+    display: none;
+    justify-content: center;
+    align-items: flex-end;
+    height: 40px;
+    margin: 15px 0;
+  }
+  
+  .audio-wave.active {
+    display: flex;
+  }
+  
+  .audio-bar {
+    width: 4px;
+    margin: 0 3px;
+    background: #ef4444;
+    border-radius: 2px;
+    animation: audioWave 0.5s ease-in-out infinite alternate;
+  }
+  
+  .audio-bar:nth-child(1) { animation-delay: 0s; height: 10px; }
+  .audio-bar:nth-child(2) { animation-delay: 0.1s; height: 20px; }
+  .audio-bar:nth-child(3) { animation-delay: 0.2s; height: 30px; }
+  .audio-bar:nth-child(4) { animation-delay: 0.1s; height: 20px; }
+  .audio-bar:nth-child(5) { animation-delay: 0s; height: 10px; }
+  
+  @keyframes audioWave {
+    from { height: 10px; }
+    to { height: 35px; }
+  }
+  
+  .recognized-text {
+    margin-top: 15px;
+    padding: 12px;
+    background: #f0f9ff;
+    border-radius: 10px;
+    font-size: 16px;
+    color: #0369a1;
+  }
+</style>
+
+<!-- Baslangic Ekrani -->
+<div class="placement-container">
+  <div class="placement-intro" id="introArea">
+    <div class="placement-intro-icon">🎯</div>
+    <h1>Seviye Belirleme Testi</h1>
+    <p>
+      Sana en uygun seviyeyi belirlemek icin kapsamli bir test yapacagiz.
+    </p>
+    
+    <div class="test-info">
+      <h3>📋 Test Hakkinda</h3>
+      <div class="test-info-item">
+        <span class="test-info-icon">📚</span>
+        <span class="test-info-text">Kelime bilgisi sorulari</span>
+      </div>
+      <div class="test-info-item">
+        <span class="test-info-icon">🎧</span>
+        <span class="test-info-text">Dinleme sorulari</span>
+      </div>
+      <div class="test-info-item">
+        <span class="test-info-icon">🎤</span>
+        <span class="test-info-text">Telaffuz sorulari (mikrofon gerekli)</span>
+      </div>
+      <div class="test-info-item">
+        <span class="test-info-icon">✍️</span>
+        <span class="test-info-text">Gramer ve cumle kurma</span>
+      </div>
+      <div class="test-info-item">
+        <span class="test-info-icon">⏱️</span>
+        <span class="test-info-text">Yaklasik 5-7 dakika</span>
+      </div>
+    </div>
+    
+    <div class="placement-levels">
+      <span class="level-badge level-a1">A1 Baslangic</span>
+      <span class="level-badge level-a2">A2 Temel</span>
+      <span class="level-badge level-b1">B1 Orta</span>
+      <span class="level-badge level-b2">B2 Ust Orta</span>
+    </div>
+    
+    <button class="btn-start-test" onclick="startTest()">Teste Basla</button>
+    <button class="btn-skip-test" onclick="skipTest()">Baslangictan baslamak istiyorum (A1)</button>
+  </div>
+  
+  <!-- Quiz Alani -->
+  <div class="quiz-area" id="quizArea">
+    <div class="quiz-header">
+      <div class="quiz-title">
+        <span id="questionTypeIcon">📚</span>
+        <span id="questionTypeText">Kelime Sorusu</span>
+        <span class="question-type-badge" id="levelBadge">A1</span>
+      </div>
+      <div class="quiz-progress">
+        <div class="quiz-progress-bar" id="progressBar" style="width: 0%"></div>
+      </div>
+      <div class="quiz-stats">
+        <span>Soru <span id="currentQ">1</span> / <span id="totalQ">20</span></span>
+        <span>✓ <span id="correctCount">0</span> Dogru</span>
+      </div>
+    </div>
+    
+    <div class="question-card">
+      <div class="question-label" id="questionLabel">Bu kelimenin Turkce karsiligi nedir?</div>
+      
+      <!-- Dinleme Alani -->
+      <div class="listen-area" id="listenArea" style="display: none;">
+        <button class="listen-btn" id="listenBtn" onclick="playAudio()">🔊</button>
+        <p class="listen-hint">Kelimeyi dinle ve anlamini sec</p>
+      </div>
+      
+      <!-- Normal Soru Metni -->
+      <div class="question-text" id="questionText">Loading...</div>
+      
+      <!-- Coktan Secmeli Secenekler -->
+      <div class="options-list" id="optionsList"></div>
+      
+      <!-- Gramer Yazma Alani -->
+      <div class="grammar-area" id="grammarArea">
+        <textarea class="grammar-textarea" id="grammarInput" placeholder="Bu kelimeyi kullanarak bir cumle yaz..."></textarea>
+        <div class="grammar-hint" id="grammarHint"></div>
+      </div>
+      
+      <!-- Telaffuz Alani -->
+      <div class="pronunciation-area" id="pronunciationArea">
+        <div class="pronunciation-word" id="pronunciationWord">apple</div>
+        <p class="pronunciation-hint" id="pronunciationHint">Türkçe: elma</p>
+        <button class="listen-word-btn" onclick="playPronunciationWord()">
+          🔊 Kelimeyi Dinle
+        </button>
+        <button class="record-btn" id="recordBtn" onclick="startRecording()">🎤</button>
+        <p class="record-status" id="recordStatus">Mikrofona tıkla ve kelimeyi söyle</p>
+        <div class="audio-wave" id="audioWave">
+          <div class="audio-bar"></div>
+          <div class="audio-bar"></div>
+          <div class="audio-bar"></div>
+          <div class="audio-bar"></div>
+          <div class="audio-bar"></div>
+        </div>
+        <div class="recognized-text" id="recognizedText" style="display: none;"></div>
+      </div>
+      
+      <!-- Feedback -->
+      <div class="feedback-area" id="feedbackArea"></div>
+    </div>
+  </div>
+  
+  <!-- Sonuc Alani -->
+  <div class="result-area" id="resultArea">
+    <div class="result-icon">🏆</div>
+    <div class="result-title">Tebrikler!</div>
+    <div class="result-level" id="finalLevel">B1</div>
+    <div class="result-description" id="levelDescription">
+      Orta seviye Ingilizce bilgisine sahipsin!
+    </div>
+    
+    <div class="result-stats">
+      <div class="stat-box">
+        <div class="stat-value" id="totalCorrect">0</div>
+        <div class="stat-label">Dogru</div>
+      </div>
+      <div class="stat-box">
+        <div class="stat-value" id="totalWrong">0</div>
+        <div class="stat-label">Yanlis</div>
+      </div>
+      <div class="stat-box">
+        <div class="stat-value" id="accuracy">0%</div>
+        <div class="stat-label">Basari</div>
+      </div>
+    </div>
+    
+    <div class="result-details">
+      <h4>📊 Seviye Bazli Sonuclar</h4>
+      <div class="level-result">
+        <span class="level-name">A1</span>
+        <div class="level-bar"><div class="level-bar-fill" id="a1Bar" style="width: 0%"></div></div>
+        <span class="level-score" id="a1Score">0/0</span>
+      </div>
+      <div class="level-result">
+        <span class="level-name">A2</span>
+        <div class="level-bar"><div class="level-bar-fill" id="a2Bar" style="width: 0%"></div></div>
+        <span class="level-score" id="a2Score">0/0</span>
+      </div>
+      <div class="level-result">
+        <span class="level-name">B1</span>
+        <div class="level-bar"><div class="level-bar-fill" id="b1Bar" style="width: 0%"></div></div>
+        <span class="level-score" id="b1Score">0/0</span>
+      </div>
+      <div class="level-result">
+        <span class="level-name">B2</span>
+        <div class="level-bar"><div class="level-bar-fill" id="b2Bar" style="width: 0%"></div></div>
+        <span class="level-score" id="b2Score">0/0</span>
+      </div>
+    </div>
+    
+    <button class="btn-start-learning" onclick="startLearning()">Ogrenmeye Basla!</button>
+  </div>
+</div>
+
+<!-- Alt Buton Paneli -->
+<div class="action-panel" id="actionPanel" style="display: none;">
+  <button class="btn-next" id="nextBtn" disabled onclick="handleNext()">DOGRULA</button>
+</div>
+
+<script>
+  const questions = {{ questions|tojson }};
+  let currentIndex = 0;
+  let correctAnswers = 0;
+  let selectedOption = null;
+  let answered = false;
+  let currentAudioText = '';
+  
+  // Seviye bazli skor takibi
+  let levelScores = { 'A1': 0, 'A2': 0, 'B1': 0, 'B2': 0 };
+  let levelCounts = { 'A1': 0, 'A2': 0, 'B1': 0, 'B2': 0 };
+  
+  // Levenshtein mesafesi hesaplama (telaffuz karsilastirmasi icin)
+  function levenshteinDistance(a, b) {
+    if (a.length === 0) return b.length;
+    if (b.length === 0) return a.length;
+    
+    const matrix = [];
+    for (let i = 0; i <= b.length; i++) {
+      matrix[i] = [i];
+    }
+    for (let j = 0; j <= a.length; j++) {
+      matrix[0][j] = j;
+    }
+    
+    for (let i = 1; i <= b.length; i++) {
+      for (let j = 1; j <= a.length; j++) {
+        if (b.charAt(i - 1) === a.charAt(j - 1)) {
+          matrix[i][j] = matrix[i - 1][j - 1];
+        } else {
+          matrix[i][j] = Math.min(
+            matrix[i - 1][j - 1] + 1,
+            matrix[i][j - 1] + 1,
+            matrix[i - 1][j] + 1
+          );
+        }
+      }
+    }
+    return matrix[b.length][a.length];
+  }
+  
+  const levelDescriptions = {
+    'A1': 'Temel seviye! Basit kelimeler ve ifadelerle baslayacaksin. Gunluk hayatta en sik kullanilan kelimeleri ogreneceksin.',
+    'A2': 'Temel-Orta seviye! Gunluk hayatta sik kullanilan ifadeleri anlayabiliyorsun. Basit cumleler kurabilirsin.',
+    'B1': 'Orta seviye! Gunluk konusmalarda rahat iletisim kurabilirsin. Fikirlerini ifade edebilir, basit metinler yazabilirsin.',
+    'B2': 'Ust-Orta seviye! Karmasik konularda bile iletisim kurabilirsin. Akici konusabilir ve detayli metinler yazabilirsin.'
+  };
+  
+  const questionTypeInfo = {
+    'word_to_turkish': { icon: '📚', text: 'Kelime Sorusu', label: 'Bu kelimenin Turkce karsiligi nedir?' },
+    'turkish_to_word': { icon: '🔄', text: 'Ceviri Sorusu', label: 'Bu kelimenin Ingilizce karsiligini yaz:' },
+    'listen_select': { icon: '🎧', text: 'Dinleme Sorusu', label: 'Dinledigin kelimenin anlamini sec:' },
+    'grammar': { icon: '✍️', text: 'Gramer Sorusu', label: 'Bu kelimeyi kullanarak dogru bir cumle kur:' },
+    'pronunciation': { icon: '🎤', text: 'Telaffuz Sorusu', label: 'Kelimeyi dogru telaffuz et:' }
+  };
+  
+  // Telaffuz icin Speech Recognition
+  let recognition = null;
+  let isRecording = false;
+  let currentPronunciationWord = '';
+  let recognizedPronunciation = '';
+  
+  function startTest() {
+    document.getElementById('introArea').style.display = 'none';
+    document.getElementById('quizArea').style.display = 'block';
+    document.getElementById('actionPanel').style.display = 'block';
+    document.getElementById('totalQ').textContent = questions.length;
+    renderQuestion();
+  }
+  
+  function skipTest() {
+    saveLevelAndRedirect('A1');
+  }
+  
+  function renderQuestion() {
+    if (currentIndex >= questions.length) {
+      showResult();
+      return;
+    }
+    
+    const q = questions[currentIndex];
+    const progress = ((currentIndex + 1) / questions.length) * 100;
+    const typeInfo = questionTypeInfo[q.type] || questionTypeInfo['word_to_turkish'];
+    
+    // Header guncelle
+    document.getElementById('progressBar').style.width = progress + '%';
+    document.getElementById('currentQ').textContent = currentIndex + 1;
+    document.getElementById('correctCount').textContent = correctAnswers;
+    document.getElementById('questionTypeIcon').textContent = typeInfo.icon;
+    document.getElementById('questionTypeText').textContent = typeInfo.text;
+    document.getElementById('levelBadge').textContent = q.level || 'A1';
+    document.getElementById('questionLabel').textContent = typeInfo.label;
+    
+    // Alanlari sifirla
+    document.getElementById('listenArea').style.display = 'none';
+    document.getElementById('questionText').style.display = 'block';
+    document.getElementById('optionsList').style.display = 'block';
+    document.getElementById('grammarArea').style.display = 'none';
+    document.getElementById('pronunciationArea').style.display = 'none';
+    document.getElementById('feedbackArea').className = 'feedback-area';
+    document.getElementById('feedbackArea').textContent = '';
+    recognizedPronunciation = '';
+    
+    // Soru tipine gore render
+    if (q.type === 'listen_select') {
+      document.getElementById('listenArea').style.display = 'block';
+      document.getElementById('questionText').style.display = 'none';
+      currentAudioText = q.audio_text || q.question;
+      renderOptions(q.options, q.answer, q.level);
+    } else if (q.type === 'grammar') {
+      document.getElementById('questionText').textContent = q.question;
+      document.getElementById('optionsList').style.display = 'none';
+      document.getElementById('grammarArea').style.display = 'block';
+      document.getElementById('grammarInput').value = '';
+      document.getElementById('grammarInput').disabled = false;
+      document.getElementById('grammarInput').placeholder = 'Bu kelimeyi kullanarak bir cumle yaz...';
+      document.getElementById('grammarHint').textContent = q.hint ? 'Ipucu: ' + q.hint : '';
+      
+      document.getElementById('grammarInput').oninput = function() {
+        document.getElementById('nextBtn').disabled = this.value.trim().length < 3;
+      };
+    } else if (q.type === 'turkish_to_word') {
+      document.getElementById('questionText').textContent = q.question;
+      document.getElementById('optionsList').style.display = 'none';
+      document.getElementById('grammarArea').style.display = 'block';
+      document.getElementById('grammarInput').value = '';
+      document.getElementById('grammarInput').disabled = false;
+      document.getElementById('grammarInput').placeholder = 'Ingilizce karsiligini yaz...';
+      document.getElementById('grammarHint').textContent = q.hint ? q.hint : '';
+      
+      document.getElementById('grammarInput').oninput = function() {
+        document.getElementById('nextBtn').disabled = this.value.trim().length < 1;
+      };
+    } else if (q.type === 'pronunciation') {
+      document.getElementById('questionText').style.display = 'none';
+      document.getElementById('optionsList').style.display = 'none';
+      document.getElementById('pronunciationArea').style.display = 'block';
+      currentPronunciationWord = q.audio_text || q.answer;
+      document.getElementById('pronunciationWord').textContent = currentPronunciationWord;
+      document.getElementById('pronunciationHint').textContent = q.hint ? 'Türkçe: ' + q.hint : '';
+      document.getElementById('recognizedText').style.display = 'none';
+      document.getElementById('recognizedText').textContent = '';
+      document.getElementById('recordStatus').textContent = 'Mikrofona tıkla ve kelimeyi söyle';
+      document.getElementById('recordBtn').classList.remove('recording');
+      document.getElementById('recordBtn').disabled = false;  // Mikrofonu her soruda aktif et
+      document.getElementById('audioWave').classList.remove('active');
+      
+      // Eski recognition varsa temizle
+      if (recognition) {
+        try {
+          recognition.stop();
+          recognition.abort();
+        } catch (e) {}
+        recognition = null;
+      }
+      isRecording = false;
+    } else {
+      // word_to_turkish - coktan secmeli
+      document.getElementById('questionText').textContent = q.question;
+      renderOptions(q.options, q.answer, q.level);
+    }
+    
+    // Buton durumu
+    answered = false;
+    selectedOption = null;
+    document.getElementById('nextBtn').disabled = true;
+    document.getElementById('nextBtn').textContent = 'DOGRULA';
+  }
+  
+  function renderOptions(options, answer, level) {
+    const optionsList = document.getElementById('optionsList');
+    optionsList.innerHTML = '';
+    
+    if (!options || options.length === 0) return;
+    
+    options.forEach((opt, idx) => {
+      const btn = document.createElement('button');
+      btn.className = 'option-btn';
+      btn.textContent = opt;
+      btn.onclick = () => selectOption(idx, opt, answer, level);
+      optionsList.appendChild(btn);
+    });
+  }
+  
+  function selectOption(idx, selected, correct, level) {
+    if (answered) return;
+    
+    selectedOption = { idx, selected, correct, level };
+    
+    // Secimi goster
+    const buttons = document.querySelectorAll('.option-btn');
+    buttons.forEach((btn, i) => {
+      btn.classList.remove('selected');
+      if (i === idx) btn.classList.add('selected');
+    });
+    
+    document.getElementById('nextBtn').disabled = false;
+  }
+  
+  function playAudio() {
+    if ('speechSynthesis' in window && currentAudioText) {
+      const utterance = new SpeechSynthesisUtterance(currentAudioText);
+      utterance.lang = 'en-US';
+      utterance.rate = 0.8;
+      speechSynthesis.speak(utterance);
+    }
+  }
+  
+  // Telaffuz icin kelimeyi dinlet
+  function playPronunciationWord() {
+    if ('speechSynthesis' in window && currentPronunciationWord) {
+      const utterance = new SpeechSynthesisUtterance(currentPronunciationWord);
+      utterance.lang = 'en-US';
+      utterance.rate = 0.8;
+      speechSynthesis.speak(utterance);
+    }
+  }
+  
+  // Ses kaydi baslat/durdur
+  function startRecording() {
+    if (!('webkitSpeechRecognition' in window) && !('SpeechRecognition' in window)) {
+      alert('Tarayiciniz ses tanima desteklemiyor. Chrome veya Edge kullanin.');
+      return;
+    }
+    
+    if (isRecording) {
+      stopRecording();
+      return;
+    }
+    
+    // Eski recognition varsa temizle
+    if (recognition) {
+      try {
+        recognition.stop();
+        recognition.abort();
+      } catch (e) {
+        console.log('Recognition cleanup:', e);
+      }
+      recognition = null;
+    }
+    
+    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+    recognition = new SpeechRecognition();
+    recognition.lang = 'en-US';
+    recognition.continuous = false;
+    recognition.interimResults = true;
+    recognition.maxAlternatives = 1;
+    
+    recognition.onstart = function() {
+      isRecording = true;
+      document.getElementById('recordBtn').classList.add('recording');
+      document.getElementById('recordStatus').textContent = 'Dinleniyor... Konus!';
+      document.getElementById('recordStatus').classList.add('listening');
+      document.getElementById('audioWave').classList.add('active');
+    };
+    
+    recognition.onresult = function(event) {
+      let finalTranscript = '';
+      let interimTranscript = '';
+      
+      for (let i = event.resultIndex; i < event.results.length; i++) {
+        const transcript = event.results[i][0].transcript;
+        if (event.results[i].isFinal) {
+          finalTranscript += transcript;
+        } else {
+          interimTranscript += transcript;
+        }
+      }
+      
+      const displayText = finalTranscript || interimTranscript;
+      if (displayText) {
+        recognizedPronunciation = displayText.trim();
+        document.getElementById('recognizedText').textContent = 'Algilanan: ' + recognizedPronunciation;
+        document.getElementById('recognizedText').style.display = 'block';
+        document.getElementById('nextBtn').disabled = false;
+      }
+    };
+    
+    recognition.onerror = function(event) {
+      console.error('STT Hata:', event.error);
+      let errorMsg = 'Ses tanima hatasi';
+      
+      switch(event.error) {
+        case 'no-speech': errorMsg = 'Ses algilanamadi. Tekrar dene.'; break;
+        case 'audio-capture': errorMsg = 'Mikrofon bulunamadi.'; break;
+        case 'not-allowed': errorMsg = 'Mikrofon izni verilmedi.'; break;
+        case 'network': errorMsg = 'Ag hatasi.'; break;
+      }
+      
+      document.getElementById('recordStatus').textContent = errorMsg;
+      stopRecording();
+    };
+    
+    recognition.onend = function() {
+      isRecording = false;
+      document.getElementById('recordBtn').classList.remove('recording');
+      document.getElementById('audioWave').classList.remove('active');
+      document.getElementById('recordStatus').classList.remove('listening');
+    };
+    
+    try {
+      recognition.start();
+    } catch (e) {
+      console.error('Recognition start error:', e);
+      document.getElementById('recordStatus').textContent = 'Mikrofon hatasi. Sayfayi yenile.';
+    }
+  }
+  
+  function stopRecording() {
+    isRecording = false;
+    if (recognition) {
+      try {
+        recognition.stop();
+      } catch (e) {
+        console.log('Stop error:', e);
+      }
+    }
+    document.getElementById('recordBtn').classList.remove('recording');
+    document.getElementById('audioWave').classList.remove('active');
+    document.getElementById('recordStatus').classList.remove('listening');
+    
+    if (recognizedPronunciation) {
+      document.getElementById('recordStatus').textContent = 'Ses algilandi! Dogrulamak icin butona tikla.';
+    } else {
+      document.getElementById('recordStatus').textContent = 'Mikrofona tikla ve kelimeyi soyle';
+    }
+  }
+  
+  function handleNext() {
+    if (!answered) {
+      validateAnswer();
+    } else {
+      currentIndex++;
+      renderQuestion();
+    }
+  }
+  
+  function validateAnswer() {
+    answered = true;
+    const q = questions[currentIndex];
+    const level = q.level || 'A1';
+    let isCorrect = false;
+    
+    levelCounts[level] = (levelCounts[level] || 0) + 1;
+    
+    if (q.type === 'grammar' || q.type === 'turkish_to_word') {
+      const userAnswer = document.getElementById('grammarInput').value.trim().toLowerCase();
+      const correctAnswer = q.answer.toLowerCase();
+      
+      if (q.type === 'turkish_to_word') {
+        // Sadece tam eşleşme veya çok küçük yazım hatası kabul et
+        isCorrect = userAnswer === correctAnswer || 
+                    levenshteinDistance(userAnswer, correctAnswer) <= 1;
+      } else {
+        const keyword = q.question.toLowerCase();
+        isCorrect = userAnswer.includes(keyword) && userAnswer.split(' ').length >= 3;
+      }
+      
+      if (isCorrect) {
+        correctAnswers++;
+        levelScores[level] = (levelScores[level] || 0) + 1;
+        document.getElementById('feedbackArea').className = 'feedback-area correct';
+        document.getElementById('feedbackArea').textContent = 'Dogru!';
+      } else {
+        document.getElementById('feedbackArea').className = 'feedback-area wrong';
+        document.getElementById('feedbackArea').textContent = 'Dogru cevap: ' + q.answer;
+      }
+      
+      document.getElementById('grammarInput').disabled = true;
+    } else if (q.type === 'pronunciation') {
+      // Telaffuz degerlendirmesi
+      const userPronunciation = recognizedPronunciation.toLowerCase().trim();
+      const correctWord = q.answer.toLowerCase().trim();
+      
+      // Basit benzerlik kontrolu
+      isCorrect = userPronunciation === correctWord || 
+                  userPronunciation.includes(correctWord) ||
+                  correctWord.includes(userPronunciation) ||
+                  levenshteinDistance(userPronunciation, correctWord) <= 2;
+      
+      document.getElementById('recordBtn').disabled = true;
+      
+      if (isCorrect) {
+        correctAnswers++;
+        levelScores[level] = (levelScores[level] || 0) + 1;
+        document.getElementById('feedbackArea').className = 'feedback-area correct';
+        document.getElementById('feedbackArea').textContent = 'Harika telaffuz!';
+      } else {
+        document.getElementById('feedbackArea').className = 'feedback-area wrong';
+        document.getElementById('feedbackArea').textContent = 'Beklenen: ' + q.answer + ' | Algilanan: ' + recognizedPronunciation;
+      }
+    } else {
+      const buttons = document.querySelectorAll('.option-btn');
+      buttons.forEach((btn, i) => {
+        btn.disabled = true;
+        if (btn.textContent === selectedOption.correct) {
+          btn.classList.add('correct');
+        } else if (i === selectedOption.idx && btn.textContent !== selectedOption.correct) {
+          btn.classList.add('wrong');
+        }
+      });
+      
+      isCorrect = selectedOption.selected === selectedOption.correct;
+      
+      if (isCorrect) {
+        correctAnswers++;
+        levelScores[level] = (levelScores[level] || 0) + 1;
+        document.getElementById('feedbackArea').className = 'feedback-area correct';
+        document.getElementById('feedbackArea').textContent = 'Harika!';
+      } else {
+        document.getElementById('feedbackArea').className = 'feedback-area wrong';
+        document.getElementById('feedbackArea').textContent = 'Dogru cevap: ' + selectedOption.correct;
+      }
+    }
+    
+    document.getElementById('nextBtn').disabled = false;
+    document.getElementById('nextBtn').textContent = currentIndex === questions.length - 1 ? 'SONUCLARI GOR' : 'DEVAM ET';
+  }
+  
+  function calculateLevel() {
+    const levels = ['A1', 'A2', 'B1', 'B2'];
+    let determinedLevel = 'A1';
+    
+    for (let i = 0; i < levels.length; i++) {
+      const level = levels[i];
+      const count = levelCounts[level] || 0;
+      const score = levelScores[level] || 0;
+      
+      if (count > 0) {
+        const accuracy = (score / count) * 100;
+        if (accuracy >= 50) {
+          determinedLevel = level;
+        } else {
+          break;
+        }
+      }
+    }
+    
+    return determinedLevel;
+  }
+  
+  function showResult() {
+    document.getElementById('quizArea').style.display = 'none';
+    document.getElementById('actionPanel').style.display = 'none';
+    document.getElementById('resultArea').style.display = 'block';
+    
+    const finalLevel = calculateLevel();
+    const totalWrong = questions.length - correctAnswers;
+    const accuracy = Math.round((correctAnswers / questions.length) * 100);
+    
+    document.getElementById('finalLevel').textContent = finalLevel;
+    document.getElementById('levelDescription').textContent = levelDescriptions[finalLevel];
+    document.getElementById('totalCorrect').textContent = correctAnswers;
+    document.getElementById('totalWrong').textContent = totalWrong;
+    document.getElementById('accuracy').textContent = accuracy + '%';
+    
+    const levels = ['a1', 'a2', 'b1', 'b2'];
+    levels.forEach(level => {
+      const upperLevel = level.toUpperCase();
+      const count = levelCounts[upperLevel] || 0;
+      const score = levelScores[upperLevel] || 0;
+      const percent = count > 0 ? Math.round((score / count) * 100) : 0;
+      
+      document.getElementById(level + 'Score').textContent = score + '/' + count;
+      const bar = document.getElementById(level + 'Bar');
+      bar.style.width = percent + '%';
+      bar.className = 'level-bar-fill ' + (percent >= 70 ? 'good' : percent >= 40 ? 'medium' : 'low');
+    });
+    
+    fetch('/placement-test/save', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ level: finalLevel })
+    });
+  }
+  
+  function startLearning() {
+    window.location.href = '/learn';
+  }
+  
+  function saveLevelAndRedirect(level) {
+    fetch('/placement-test/save', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ level: level })
+    }).then(() => {
+      window.location.href = '/learn';
+    });
+  }
+</script>
+{% endblock %}

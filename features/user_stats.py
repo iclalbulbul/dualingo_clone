@@ -313,7 +313,7 @@ class UserStats:
         
         try:
             cursor.execute("""
-                SELECT input_type, user_input, is_correct, score, timestamp
+                SELECT input_type, input_text, is_correct, score, timestamp
                 FROM user_inputs 
                 WHERE user_id = ?
                 ORDER BY timestamp DESC
@@ -417,6 +417,11 @@ class UserStats:
         """
         Ardışık giriş yapılan gün sayısını hesapla.
         user_inputs tablosundan kontrol eder.
+        
+        Mantık:
+        - Bugün aktivite varsa, bugünden geriye say
+        - Bugün aktivite yoksa ama dün varsa, dünden geriye say (streak devam ediyor)
+        - Her ikisi de yoksa streak = 0
         """
         conn = get_db_connection()
         cursor = conn.cursor()
@@ -424,11 +429,37 @@ class UserStats:
         try:
             streak = 0
             today = datetime.now().date()
+            yesterday = today - timedelta(days=1)
             
-            for i in range(365):
+            # Bugün aktivite var mı?
+            cursor.execute("""
+                SELECT COUNT(*) FROM user_inputs 
+                WHERE user_id = ? AND DATE(timestamp) = ?
+            """, (user_id, today.isoformat()))
+            today_has_activity = cursor.fetchone()[0] > 0
+            
+            # Dün aktivite var mı?
+            cursor.execute("""
+                SELECT COUNT(*) FROM user_inputs 
+                WHERE user_id = ? AND DATE(timestamp) = ?
+            """, (user_id, yesterday.isoformat()))
+            yesterday_has_activity = cursor.fetchone()[0] > 0
+            
+            # Başlangıç gününü belirle
+            if today_has_activity:
+                # Bugün aktivite var, bugünden başla
+                start_offset = 0
+            elif yesterday_has_activity:
+                # Bugün yok ama dün var, dünden başla (streak kırılmamış)
+                start_offset = 1
+            else:
+                # Ne bugün ne dün aktivite yok, streak 0
+                return 0
+            
+            # Ardışık günleri say
+            for i in range(start_offset, 365):
                 check_date = (today - timedelta(days=i)).isoformat()
                 
-                # user_inputs tablosundan kontrol et (session_logs yerine)
                 cursor.execute("""
                     SELECT COUNT(*) FROM user_inputs 
                     WHERE user_id = ? AND DATE(timestamp) = ?

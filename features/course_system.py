@@ -8,6 +8,7 @@ Bu modül mevcut courses.py'yi BOZMAZ, ayrı bir sistem olarak çalışır.
 """
 
 from db_utils import get_db_connection
+from translation_utils import get_translation
 from datetime import datetime
 from typing import Dict, List, Any, Optional
 import json
@@ -287,30 +288,68 @@ class CourseSystem:
     
     # ==================== İLERLEME YÖNETİMİ ====================
     
-    def init_user_progress(self, user_id: int):
-        """Kullanıcı için kurs ilerlemesini başlat."""
+    def init_user_progress(self, user_id: int, start_level: str = 'A1'):
+        """Kullanıcı için kurs ilerlemesini belirtilen seviyeden başlat."""
         conn = get_db_connection()
         cursor = conn.cursor()
         
+        # Seviye sıralaması
+        level_order = {'A1': 1, 'A2': 2, 'B1': 3, 'B2': 4}
+        start_order = level_order.get(start_level, 1)
+        
         try:
-            # Kullanıcı durumu oluştur
-            cursor.execute("""
-                INSERT OR IGNORE INTO user_course_state (user_id, current_level, total_xp, hearts)
-                VALUES (?, 'A1', 0, 5)
-            """, (user_id,))
+            # Mevcut progress kayıtlarını temizle (yeni baştan başlatma)
+            cursor.execute("DELETE FROM user_course_progress WHERE user_id = ?", (user_id,))
+            cursor.execute("DELETE FROM user_course_state WHERE user_id = ?", (user_id,))
             
-            # İlk üniteyi aç (A1 - Ünite 1)
+            # Kullanıcı durumu oluştur (belirtilen seviyeden)
             cursor.execute("""
-                SELECT unit_id FROM course_units WHERE level_code = 'A1' AND order_num = 1
-            """)
+                INSERT INTO user_course_state (user_id, current_level, total_xp, hearts)
+                VALUES (?, ?, 0, 5)
+            """, (user_id, start_level))
+            
+            # Önceki seviyelerin tüm ünitelerini ve derslerini tamamlanmış olarak işaretle
+            for level_code, order in level_order.items():
+                if order < start_order:
+                    # Bu seviyedeki tüm üniteleri al
+                    cursor.execute("""
+                        SELECT unit_id FROM course_units WHERE level_code = ?
+                    """, (level_code,))
+                    units = cursor.fetchall()
+                    
+                    for (unit_id,) in units:
+                        # Üniteyi tamamlanmış olarak işaretle
+                        cursor.execute("""
+                            INSERT INTO user_course_progress 
+                            (user_id, level_code, unit_id, status, crowns)
+                            VALUES (?, ?, ?, 'completed', 3)
+                        """, (user_id, level_code, unit_id))
+                        
+                        # Bu ünitedeki dersleri de tamamlanmış olarak işaretle
+                        cursor.execute("""
+                            SELECT lesson_id FROM course_lessons WHERE unit_id = ?
+                        """, (unit_id,))
+                        lessons = cursor.fetchall()
+                        
+                        for (lesson_id,) in lessons:
+                            cursor.execute("""
+                                INSERT INTO user_course_progress 
+                                (user_id, level_code, unit_id, lesson_id, status, best_score)
+                                VALUES (?, ?, ?, ?, 'completed', 100)
+                            """, (user_id, level_code, unit_id, lesson_id))
+            
+            # Başlangıç seviyesinin ilk ünitesini aç
+            cursor.execute("""
+                SELECT unit_id FROM course_units WHERE level_code = ? AND order_num = 1
+            """, (start_level,))
             first_unit = cursor.fetchone()
             
             if first_unit:
                 cursor.execute("""
-                    INSERT OR IGNORE INTO user_course_progress 
+                    INSERT INTO user_course_progress 
                     (user_id, level_code, unit_id, status)
-                    VALUES (?, 'A1', ?, 'unlocked')
-                """, (user_id, first_unit[0]))
+                    VALUES (?, ?, ?, 'unlocked')
+                """, (user_id, start_level, first_unit[0]))
                 
                 # İlk dersi de aç
                 cursor.execute("""
@@ -320,13 +359,13 @@ class CourseSystem:
                 
                 if first_lesson:
                     cursor.execute("""
-                        INSERT OR IGNORE INTO user_course_progress 
+                        INSERT INTO user_course_progress 
                         (user_id, level_code, unit_id, lesson_id, status)
-                        VALUES (?, 'A1', ?, ?, 'unlocked')
-                    """, (user_id, first_unit[0], first_lesson[0]))
+                        VALUES (?, ?, ?, ?, 'unlocked')
+                    """, (user_id, start_level, first_unit[0], first_lesson[0]))
             
             conn.commit()
-            print(f"✓ Kullanıcı {user_id} için kurs ilerlemesi başlatıldı")
+            print(f"✓ Kullanıcı {user_id} için kurs ilerlemesi {start_level} seviyesinden başlatıldı")
             return True
             
         except Exception as e:
@@ -350,8 +389,24 @@ class CourseSystem:
             state = cursor.fetchone()
             
             if not state:
-                self.init_user_progress(user_id)
-                state = ('A1', 0, 0, 5, 0)
+                # Kullanıcının users tablosundaki seviyesini al
+                cursor.execute("SELECT level FROM users WHERE user_id = ?", (user_id,))
+                user_level_row = cursor.fetchone()
+                user_level = user_level_row[0] if user_level_row and user_level_row[0] else 'A1'
+                conn.close()  # init_user_progress kendi bağlantısını kullanacak
+                
+                self.init_user_progress(user_id, user_level)
+                
+                # Tekrar bağlan ve state'i al
+                conn = get_db_connection()
+                cursor = conn.cursor()
+                cursor.execute("""
+                    SELECT current_level, total_xp, total_crowns, hearts, streak_days
+                    FROM user_course_state WHERE user_id = ?
+                """, (user_id,))
+                state = cursor.fetchone()
+                if not state:
+                    state = (user_level, 0, 0, 5, 0)
             
             current_level, total_xp, total_crowns, hearts, streak = state
             
@@ -385,7 +440,7 @@ class CourseSystem:
                                COALESCE(p.status, 'locked') as status,
                                COALESCE(p.best_score, 0) as best_score
                         FROM course_lessons l
-                        LEFT JOIN user_course_progress p ON l.lesson_id = p.lesson_id AND p.user_id = ?
+                        LEFT JOIN user_course_progress p ON l.lesson_id = p.lesson_id AND p.user_id = ? AND p.lesson_id IS NOT NULL
                         WHERE l.unit_id = ?
                         ORDER BY l.order_num
                     """, (user_id, unit_id))
@@ -548,9 +603,9 @@ class CourseSystem:
         cursor = conn.cursor()
         
         try:
-            # Önce ders tipini al
+            # Önce ders tipini ve ünite başlığını al
             cursor.execute("""
-                SELECT l.lesson_type, l.unit_id, u.level_code
+                SELECT l.lesson_type, l.unit_id, u.level_code, u.title
                 FROM course_lessons l
                 JOIN course_units u ON l.unit_id = u.unit_id
                 WHERE l.lesson_id = ?
@@ -560,7 +615,7 @@ class CourseSystem:
             if not lesson_info:
                 return []
             
-            lesson_type, unit_id, level_code = lesson_info
+            lesson_type, unit_id, level_code, unit_title = lesson_info
             
             # Hazır sorular varsa getir
             cursor.execute("""
@@ -584,9 +639,9 @@ class CourseSystem:
                 }
                 questions.append(q)
             
-            # Hazır soru yoksa, words tablosundan dinamik oluştur
+            # Hazır soru yoksa, words tablosundan dinamik oluştur (ünite konusuna göre)
             if not questions:
-                questions = self._generate_questions(lesson_type, level_code, 10)
+                questions = self._generate_questions(lesson_type, level_code, 10, unit_title)
             
             return questions
             
@@ -596,46 +651,174 @@ class CourseSystem:
         finally:
             conn.close()
     
-    def _generate_questions(self, lesson_type: str, level_code: str, count: int = 10) -> List[Dict]:
+    def _generate_questions(self, lesson_type: str, level_code: str, count: int = 10, unit_title: str = None) -> List[Dict]:
         """Words tablosundan dinamik soru oluştur."""
         conn = get_db_connection()
         cursor = conn.cursor()
         
         questions = []
         
+        # Ünite → Kategori eşleştirmesi
+        unit_categories = {
+            # A1
+            "Selamlaşma": ["greetings", "introduction"],
+            "Kendini Tanıtma": ["introduction", "greetings"],
+            "Sayılar": ["numbers", "time"],
+            "Renkler": ["colors", "descriptive"],
+            "Aile": ["family", "introduction"],
+            
+            # A2
+            "Günlük Rutinler": ["daily_routine", "time", "actions"],
+            "Yiyecek-İçecek": ["food", "shopping"],
+            "Hava Durumu": ["weather", "nature"],
+            "Ulaşım": ["transport", "travel"],
+            "Alışveriş": ["shopping", "clothing", "numbers"],
+            
+            # B1
+            "İş Hayatı": ["work", "communication", "technology"],
+            "Sağlık": ["health", "body", "emotions"],
+            "Seyahat": ["travel", "transport", "culture"],
+            "Eğitim": ["education", "communication"],
+            "Teknoloji": ["technology", "communication"],
+            
+            # B2
+            "Medya ve Haberler": ["media", "communication"],
+            "Çevre": ["environment", "nature", "animals"],
+            "Kültür ve Sanat": ["culture", "emotions"],
+            "Ekonomi": ["economy", "work"],
+            "Politika": ["politics", "communication"],
+        }
+        
         try:
-            # Seviyeye uygun kelimeleri al (turkish'i dolu olanlar)
-            cursor.execute("""
-                SELECT word_id, english, turkish, example_sentence
-                FROM words
-                WHERE level = ? AND turkish IS NOT NULL AND turkish != ''
-                ORDER BY RANDOM()
-                LIMIT ?
-            """, (level_code, count))
+            # Üniteye ait kategorileri al
+            categories = []
+            if unit_title and unit_title in unit_categories:
+                categories = unit_categories[unit_title]
             
-            words = cursor.fetchall()
-            
-            # Eğer bu seviyede yeterli kelime yoksa, tüm seviyelerden al
-            if len(words) < count:
-                cursor.execute("""
+            # Önce kategoriye göre kelime ara (SEVİYE FİLTRESİ İLE)
+            words = []
+            if categories:
+                placeholders = ",".join(["?" for _ in categories])
+                cursor.execute(f"""
                     SELECT word_id, english, turkish, example_sentence
                     FROM words
-                    WHERE turkish IS NOT NULL AND turkish != ''
+                    WHERE category IN ({placeholders})
+                    AND level = ?
+                    AND turkish IS NOT NULL AND turkish != ''
                     ORDER BY RANDOM()
                     LIMIT ?
-                """, (count,))
+                """, (*categories, level_code, count))
                 words = cursor.fetchall()
+            
+            # Eğer kategoride yeterli kelime yoksa, aynı seviyeden genel kelimelerden tamamla
+            if len(words) < count:
+                remaining = count - len(words)
+                existing_ids = [w[0] for w in words]
+                
+                if existing_ids:
+                    placeholders = ",".join(["?" for _ in existing_ids])
+                    cursor.execute(f"""
+                        SELECT word_id, english, turkish, example_sentence
+                        FROM words
+                        WHERE turkish IS NOT NULL AND turkish != ''
+                        AND level = ?
+                        AND category != 'other'
+                        AND word_id NOT IN ({placeholders})
+                        ORDER BY RANDOM()
+                        LIMIT ?
+                    """, (level_code, *existing_ids, remaining))
+                else:
+                    cursor.execute("""
+                        SELECT word_id, english, turkish, example_sentence
+                        FROM words
+                        WHERE turkish IS NOT NULL AND turkish != ''
+                        AND level = ?
+                        AND category != 'other'
+                        ORDER BY RANDOM()
+                        LIMIT ?
+                    """, (level_code, remaining))
+                
+                words.extend(cursor.fetchall())
+            
+            # Hala yeterli kelime yoksa, bir alt veya üst seviyeden al
+            if len(words) < count:
+                remaining = count - len(words)
+                existing_ids = [w[0] for w in words]
+                
+                # Seviye sırası
+                level_order = ['A1', 'A2', 'B1', 'B2', 'C1', 'C2']
+                current_idx = level_order.index(level_code) if level_code in level_order else 0
+                
+                # Yakın seviyeleri dene (önce bir alt, sonra bir üst)
+                nearby_levels = []
+                if current_idx > 0:
+                    nearby_levels.append(level_order[current_idx - 1])
+                if current_idx < len(level_order) - 1:
+                    nearby_levels.append(level_order[current_idx + 1])
+                
+                if existing_ids and nearby_levels:
+                    id_placeholders = ",".join(["?" for _ in existing_ids])
+                    level_placeholders = ",".join(["?" for _ in nearby_levels])
+                    cursor.execute(f"""
+                        SELECT word_id, english, turkish, example_sentence
+                        FROM words
+                        WHERE turkish IS NOT NULL AND turkish != ''
+                        AND level IN ({level_placeholders})
+                        AND word_id NOT IN ({id_placeholders})
+                        ORDER BY RANDOM()
+                        LIMIT ?
+                    """, (*nearby_levels, *existing_ids, remaining))
+                elif nearby_levels:
+                    level_placeholders = ",".join(["?" for _ in nearby_levels])
+                    cursor.execute(f"""
+                        SELECT word_id, english, turkish, example_sentence
+                        FROM words
+                        WHERE turkish IS NOT NULL AND turkish != ''
+                        AND level IN ({level_placeholders})
+                        ORDER BY RANDOM()
+                        LIMIT ?
+                    """, (*nearby_levels, remaining))
+                
+                words.extend(cursor.fetchall())
             
             for i, word in enumerate(words):
                 word_id, english, turkish, example = word
                 
-                # Yanlış seçenekler için başka kelimeler al
+                # Türkçe çevirisi yoksa, API'den al (cache sistemi ile)
+                if not turkish or turkish.strip() == '':
+                    turkish = get_translation(english)
+                    if not turkish:
+                        continue  # Çeviri alınamazsa bu kelimeyi atla
+                
+                # Yanlış seçenekler için aynı seviyeden başka kelimeler al
                 cursor.execute("""
                     SELECT turkish FROM words 
                     WHERE word_id != ? AND turkish IS NOT NULL AND turkish != ''
-                    ORDER BY RANDOM() LIMIT 3
-                """, (word_id,))
+                    AND level = ?
+                    ORDER BY RANDOM() LIMIT 5
+                """, (word_id, level_code))
                 wrong_options = [r[0] for r in cursor.fetchall()]
+                
+                # Eğer aynı seviyeden yeterli seçenek bulunamazsa, yakın seviyelerden tamamla
+                if len(wrong_options) < 3:
+                    level_order = ['A1', 'A2', 'B1', 'B2', 'C1', 'C2']
+                    current_idx = level_order.index(level_code) if level_code in level_order else 0
+                    nearby_levels = []
+                    if current_idx > 0:
+                        nearby_levels.append(level_order[current_idx - 1])
+                    if current_idx < len(level_order) - 1:
+                        nearby_levels.append(level_order[current_idx + 1])
+                    
+                    if nearby_levels:
+                        level_placeholders = ",".join(["?" for _ in nearby_levels])
+                        cursor.execute(f"""
+                            SELECT turkish FROM words 
+                            WHERE word_id != ? AND turkish IS NOT NULL AND turkish != ''
+                            AND level IN ({level_placeholders})
+                            ORDER BY RANDOM() LIMIT ?
+                        """, (word_id, *nearby_levels, 5 - len(wrong_options)))
+                        wrong_options.extend([r[0] for r in cursor.fetchall()])
+                
                 # Yanlış seçeneklerde doğru cevap varsa çıkar
                 wrong_options = [opt for opt in wrong_options if opt.lower() != turkish.lower()][:3]
                 # Tüm seçenekleri karıştır
@@ -660,7 +843,7 @@ class CourseSystem:
                         "question": turkish,
                         "answer": english,
                         "options": [],  # Yazarak cevap
-                        "hint": f"İpucu: {english[:2]}...",
+                        "hint": f"{english[:1] if len(english) <= 2 else english[:2]}...",
                         "word_id": word_id
                     }
                 elif lesson_type == "listening":
@@ -677,12 +860,23 @@ class CourseSystem:
                 elif lesson_type == "grammar":
                     q = {
                         "question_id": i + 1,
-                        "type": "fill_blank",
-                        "question": example.replace(english, "_____") if example else f"I _____ (use: {english})",
+                        "type": "grammar",
+                        "question": english,
+                        "answer": english,
+                        "options": [],
+                        "hint": example if example else f"Örnek: I {english} every day.",
+                        "word_id": word_id
+                    }
+                elif lesson_type == "pronunciation":
+                    q = {
+                        "question_id": i + 1,
+                        "type": "pronunciation",
+                        "question": f"'{english}' kelimesini telaffuz et",
                         "answer": english,
                         "options": [],
                         "hint": turkish,
-                        "word_id": word_id
+                        "word_id": word_id,
+                        "audio_text": english
                     }
                 else:  # quiz - karışık
                     q = {

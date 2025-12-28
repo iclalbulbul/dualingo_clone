@@ -1,13 +1,13 @@
 """
 db_utils.py
 
-SQLite tabanlı temel şema ve yardımcı seed fonksiyonları.
+SQLite tabanli temel sema ve yardimci seed fonksiyonlari.
 
-Bu dosya şunları yapar:
-- `init_db()` : gerekli tabloları oluşturur
-- `seed_topics_from_repo()` : `database_icin_kelime/data` içindeki .txt dosyalarını okuyup `topics` tablosuna ekler
+Bu dosya sunlari yapar:
+- init_db() : gerekli tablolari olusturur
+- seed_topics_from_repo() : database_icin_kelime/data icindeki .txt dosyalarini okuyup topics tablosuna ekler
 
-NOT: Büyük kelime importları ayrı bir importer script'i ile yapılmalı (chunking önerilir).
+NOT: Buyuk kelime importlari ayri bir importer scripti ile yapilmali (chunking onerilir).
 """
 
 import os
@@ -18,20 +18,32 @@ from datetime import datetime, timedelta
 
 DB_PATH = os.path.join(os.path.dirname(__file__), "app.db")
 
-# Thread-safe bağlantı için lock
-_db_lock = threading.Lock()
+# Thread-safe bağlantı için lock (yazma işlemleri için)
+_db_write_lock = threading.Lock()
 
 
 def _connect():
-	conn = sqlite3.connect(DB_PATH, timeout=30, check_same_thread=False)
+	"""Veritabanı bağlantısı oluşturur."""
+	conn = sqlite3.connect(DB_PATH, timeout=60, check_same_thread=False)
 	# WAL mode - daha iyi eşzamanlılık için
 	conn.execute("PRAGMA journal_mode=WAL")
-	conn.execute("PRAGMA busy_timeout=30000")
+	conn.execute("PRAGMA busy_timeout=60000")  # 60 saniye bekle
+	conn.execute("PRAGMA synchronous=NORMAL")  # Performans için
+	return conn
+
+
+def get_db_connection():
+	"""Veritabani baglantisi dondur."""
+	conn = sqlite3.connect(DB_PATH, timeout=60, check_same_thread=False)
+	conn.execute("PRAGMA journal_mode=WAL")
+	conn.execute("PRAGMA busy_timeout=60000")
+	conn.execute("PRAGMA synchronous=NORMAL")
+	conn.row_factory = sqlite3.Row
 	return conn
 
 
 def init_db():
-	"""Veritabanı ve tabloları oluşturur."""
+	"""Veritabani ve tablolari olusturur."""
 	conn = _connect()
 	cur = conn.cursor()
 
@@ -40,11 +52,24 @@ def init_db():
 	CREATE TABLE IF NOT EXISTS users (
 		user_id INTEGER PRIMARY KEY AUTOINCREMENT,
 		username TEXT UNIQUE NOT NULL,
+		password_hash TEXT,
 		level TEXT DEFAULT 'A1',
 		created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
 		last_login TIMESTAMP
 	)
 	""")
+	
+	# password_hash kolonu yoksa ekle (migration)
+	try:
+		cur.execute("ALTER TABLE users ADD COLUMN password_hash TEXT")
+	except:
+		pass  # Kolon zaten var
+
+	# placement_test_done kolonu yoksa ekle (migration)
+	try:
+		cur.execute("ALTER TABLE users ADD COLUMN placement_test_done INTEGER DEFAULT 0")
+	except:
+		pass  # Kolon zaten var
 
 	# topics
 	cur.execute("""
@@ -63,6 +88,7 @@ def init_db():
 		english TEXT NOT NULL,
 		turkish TEXT,
 		level TEXT,
+		category TEXT,
 		topic_id INTEGER,
 		example_sentence TEXT,
 		pronunciation TEXT,
@@ -72,6 +98,15 @@ def init_db():
 		FOREIGN KEY (topic_id) REFERENCES topics(topic_id)
 	)
 	""")
+	
+	# category kolonu yoksa ekle (migration)
+	try:
+		cur.execute("ALTER TABLE words ADD COLUMN category TEXT")
+	except:
+		pass  # Kolon zaten var
+	
+	# category için index oluştur (hızlı sorgular için)
+	cur.execute("CREATE INDEX IF NOT EXISTS idx_words_category ON words(category)")
 
 	# grammar_rules
 	cur.execute("""
@@ -95,11 +130,29 @@ def init_db():
 		history_id INTEGER PRIMARY KEY AUTOINCREMENT,
 		user_id INTEGER NOT NULL,
 		practice_type TEXT NOT NULL,
+		word_id INTEGER,
+		is_correct BOOLEAN,
+		attempted_answer TEXT,
 		score REAL,
 		timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-		FOREIGN KEY (user_id) REFERENCES users(user_id)
+		FOREIGN KEY (user_id) REFERENCES users(user_id),
+		FOREIGN KEY (word_id) REFERENCES words(word_id)
 	)
 	""")
+	
+	# Migration: Eksik kolonları ekle (mevcut tablolar için)
+	try:
+		cur.execute("ALTER TABLE practice_history ADD COLUMN word_id INTEGER")
+	except:
+		pass
+	try:
+		cur.execute("ALTER TABLE practice_history ADD COLUMN is_correct BOOLEAN")
+	except:
+		pass
+	try:
+		cur.execute("ALTER TABLE practice_history ADD COLUMN attempted_answer TEXT")
+	except:
+		pass
 
 	# grammar_errors
 	cur.execute("""
@@ -265,11 +318,23 @@ CREATE INDEX IF NOT EXISTS idx_mistakes_user_next ON mistakes (user_id, next_rev
 		description TEXT,
 		created_by INTEGER NOT NULL,
 		max_members INTEGER DEFAULT 20,
+		member_count INTEGER DEFAULT 1,
 		is_private BOOLEAN DEFAULT 0,
+		is_public BOOLEAN DEFAULT 1,
 		created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
 		FOREIGN KEY (created_by) REFERENCES users(user_id)
 	)
 	""")
+	
+	# Migration: study_groups eksik kolonlar
+	try:
+		cur.execute("ALTER TABLE study_groups ADD COLUMN member_count INTEGER DEFAULT 1")
+	except:
+		pass
+	try:
+		cur.execute("ALTER TABLE study_groups ADD COLUMN is_public BOOLEAN DEFAULT 1")
+	except:
+		pass
 
 	# group_members - Grup üyeleri
 	cur.execute("""
@@ -313,9 +378,16 @@ CREATE INDEX IF NOT EXISTS idx_mistakes_user_next ON mistakes (user_id, next_rev
 		is_read BOOLEAN DEFAULT 0,
 		metadata TEXT,
 		created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+		read_at TIMESTAMP,
 		FOREIGN KEY (user_id) REFERENCES users(user_id)
 	)
 	""")
+	
+	# Migration: read_at kolonu ekle (mevcut tablolar için)
+	try:
+		cur.execute("ALTER TABLE notifications ADD COLUMN read_at TIMESTAMP")
+	except:
+		pass  # Kolon zaten var
 
 	# goals - Kullanıcı hedefleri
 	cur.execute("""
@@ -384,17 +456,8 @@ def seed_topics_from_repo(repo_data_dir: str = None) -> int:
 	return added
 
 
-def get_db_connection():
-	"""Veritabanı bağlantısı döndür."""
-	conn = sqlite3.connect(DB_PATH, timeout=30, check_same_thread=False)
-	conn.execute("PRAGMA journal_mode=WAL")
-	conn.execute("PRAGMA busy_timeout=30000")
-	conn.row_factory = sqlite3.Row
-	return conn
-
-
 def get_user_id(username: str):
-	"""Kullanıcı adından user_id döndür."""
+	"""Kullanici adindan user_id dondur."""
 	conn = get_db_connection()
 	cursor = conn.cursor()
 	cursor.execute("SELECT user_id FROM users WHERE username = ?", (username,))
@@ -404,7 +467,7 @@ def get_user_id(username: str):
 
 
 def create_or_get_user(username: str) -> int:
-	"""Kullanıcı varsa ID'sini döndür, yoksa oluştur."""
+	"""Kullanici varsa ID dondur, yoksa olustur."""
 	conn = get_db_connection()
 	cursor = conn.cursor()
 	
@@ -422,10 +485,75 @@ def create_or_get_user(username: str) -> int:
 	return user_id
 
 
+def register_user(username: str, password: str) -> dict:
+	"""Yeni kullanici kaydi olustur."""
+	import hashlib
+	conn = get_db_connection()
+	cursor = conn.cursor()
+	
+	# Kullanıcı adı var mı kontrol et
+	cursor.execute("SELECT user_id FROM users WHERE username = ?", (username,))
+	if cursor.fetchone():
+		conn.close()
+		return {"success": False, "error": "Bu kullanıcı adı zaten kullanılıyor."}
+	
+	# Şifreyi hashle
+	password_hash = hashlib.sha256(password.encode()).hexdigest()
+	
+	# Kullanıcı oluştur
+	cursor.execute(
+		"INSERT INTO users (username, password_hash, level) VALUES (?, ?, ?)",
+		(username, password_hash, 'A1')
+	)
+	user_id = cursor.lastrowid
+	
+	conn.commit()
+	conn.close()
+	return {"success": True, "user_id": user_id}
+
+
+def login_user(username: str, password: str) -> dict:
+	"""Kullanici girisi yap."""
+	import hashlib
+	conn = get_db_connection()
+	cursor = conn.cursor()
+	
+	# Kullanıcıyı bul
+	cursor.execute("SELECT user_id, password_hash FROM users WHERE username = ?", (username,))
+	row = cursor.fetchone()
+	
+	if not row:
+		conn.close()
+		return {"success": False, "error": "Kullanıcı bulunamadı."}
+	
+	user_id, stored_hash = row
+	
+	# Eski kullanıcılar için (şifresi olmayan)
+	if not stored_hash:
+		# İlk giriş - şifreyi ayarla
+		password_hash = hashlib.sha256(password.encode()).hexdigest()
+		cursor.execute("UPDATE users SET password_hash = ? WHERE user_id = ?", (password_hash, user_id))
+		conn.commit()
+		conn.close()
+		return {"success": True, "user_id": user_id, "message": "Şifreniz kaydedildi."}
+	
+	# Şifreyi kontrol et
+	password_hash = hashlib.sha256(password.encode()).hexdigest()
+	if password_hash != stored_hash:
+		conn.close()
+		return {"success": False, "error": "Şifre yanlış."}
+	
+	# Son giriş zamanını güncelle
+	cursor.execute("UPDATE users SET last_login = CURRENT_TIMESTAMP WHERE user_id = ?", (user_id,))
+	conn.commit()
+	conn.close()
+	return {"success": True, "user_id": user_id}
+
+
 def record_mistake(user_id: int, item_key: str, wrong_answer: str, correct_answer: str, lesson_id: str = None, context: str = None):
-	"""Kullanıcının bir hatasını kaydeder veya mevcut kaydı günceller.
-	Varsa `count` arttırılır, yoksa yeni satır eklenir.
-	Döner: `mistake_id`.
+	"""Kullanicinin bir hatasini kaydeder veya mevcut kaydi gunceller.
+	Varsa count arttirilir, yoksa yeni satir eklenir.
+	Doner: mistake_id.
 	"""
 	conn = get_db_connection()
 	cur = conn.cursor()
@@ -452,8 +580,8 @@ def record_mistake(user_id: int, item_key: str, wrong_answer: str, correct_answe
 
 
 def get_due_mistakes(user_id: int, limit: int = 20) -> List[dict]:
-	"""`next_review` zamanı gelen veya `NULL` olan hataları döndürür (öncelik: next_review, sonra count).
-	Dönen liste dict satırlardan oluşur.
+	"""next_review zamani gelen veya NULL olan hatalari dondurur (oncelik: next_review, sonra count).
+	Donen liste dict satirlardan olusur.
 	"""
 	conn = get_db_connection()
 	cur = conn.cursor()
@@ -468,8 +596,8 @@ def get_due_mistakes(user_id: int, limit: int = 20) -> List[dict]:
 
 
 def update_review_result(user_id: int, item_key: str, quality: int):
-	"""SM-2 mantığıyla bir tekrar sonucunu uygular.
-	`quality` 0-5 arası (>=3 geçer), fonksiyon yeni SRS alanlarını döndürür.
+	"""SM-2 mantigi ile bir tekrar sonucunu uygular.
+	quality 0-5 arasi (>=3 gecer), fonksiyon yeni SRS alanlarini dondurur.
 	"""
 	if quality < 0:
 		quality = 0
@@ -526,8 +654,21 @@ def update_review_result(user_id: int, item_key: str, quality: int):
 	}
 
 
+def get_user_mistakes(user_id: int, limit: int = 100):
+	"""Kullanicinin tum mistakes kayitlarini dondurur."""
+	conn = get_db_connection()
+	cur = conn.cursor()
+	cur.execute(
+		"SELECT * FROM mistakes WHERE user_id = ? ORDER BY last_seen DESC LIMIT ?",
+		(user_id, limit),
+	)
+	rows = cur.fetchall()
+	conn.close()
+	return [dict(r) for r in rows]
+
+
 if __name__ == "__main__":
 	init_db()
-	# Sadece topic satırlarını ekleyelim; kelime importları ayrı script ile yapılmalı
+	# Sadece topic satirlarini ekleyelim; kelime importlari ayri script ile yapilmali
 	seed_topics_from_repo()
 

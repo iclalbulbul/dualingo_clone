@@ -1,8 +1,8 @@
-from flask import Flask, render_template, request, redirect, url_for, session, jsonify
+from flask import Flask, render_template, request, redirect, url_for, session, jsonify, flash
 from backend.rules import analyze_sentence
-from backend.ai_utils import grammar_feedback_json, pronunciation_feedback, generate_sentence, personalized_feedback, generate_custom_lesson
+from backend.ai_utils import grammar_feedback_json, pronunciation_feedback, generate_sentence, personalized_feedback, generate_custom_lesson, mistake_feedback
 from backend.speech_stt import recognize_from_audio_file, recognize_from_blob
-from db_utils import get_db_connection, get_user_id, create_or_get_user, update_review_result
+from db_utils import get_db_connection, get_user_id, create_or_get_user, update_review_result, record_mistake, register_user, login_user, get_user_mistakes
 from backend.recommender import get_review_quiz
 from translation_utils import get_translation, check_answer
 from user_db import UserInputLogger
@@ -16,9 +16,56 @@ from features.course_system import course_system
 import json
 import random
 from datetime import datetime
+import time
+import os
+
+
+# ==================== RATE LIMITER ====================
+class RateLimiter:
+    """Basit rate limiter - API isteklerini sınırlar."""
+    
+    def __init__(self, max_requests: int = 20, window_seconds: int = 60):
+        self.max_requests = max_requests
+        self.window_seconds = window_seconds
+        self.requests = []
+    
+    def _clean_old_requests(self):
+        """Eski istekleri temizle."""
+        now = time.time()
+        self.requests = [r for r in self.requests if now - r < self.window_seconds]
+    
+    def can_request(self) -> bool:
+        """İstek yapılabilir mi?"""
+        self._clean_old_requests()
+        return len(self.requests) < self.max_requests
+    
+    def add_request(self):
+        """Yeni istek ekle."""
+        self.requests.append(time.time())
+    
+    def get_remaining(self) -> int:
+        """Kalan istek hakkı."""
+        self._clean_old_requests()
+        return max(0, self.max_requests - len(self.requests))
+    
+    def get_wait_time(self) -> float:
+        """Yeni istek için bekleme süresi (saniye)."""
+        if self.can_request():
+            return 0
+        self._clean_old_requests()
+        if not self.requests:
+            return 0
+        oldest = min(self.requests)
+        return max(0, self.window_seconds - (time.time() - oldest))
+
 
 app = Flask(__name__)
-app.secret_key = "cok_gizli_anahtar"
+# Secret key: Önce environment variable'dan al, yoksa fallback kullan
+# Production'da mutlaka SECRET_KEY environment variable'ı set edilmeli!
+app.secret_key = os.environ.get("SECRET_KEY", "dev_secret_key_change_in_production_" + str(hash("dualingo_clone")))
+
+# Rate limiter instance
+rate_limiter = RateLimiter(max_requests=20, window_seconds=60)
 
 # Managers'ı başlat
 logger = UserInputLogger()
@@ -91,13 +138,26 @@ def api_dashboard_stats():
 def login():
     if request.method == "POST":
         username = request.form.get("username")
+        password = request.form.get("password")
+        action = request.form.get("action", "login")  # login veya register
 
         if not username:
-            # hata olduğunda yine login sayfasını render edeceğiz
             return render_template("login.html", error="Kullanıcı adı boş olamaz.")
+        
+        if not password:
+            return render_template("login.html", error="Şifre boş olamaz.")
 
-        # Kullanıcı var mı yok mu kontrol et, yoksa oluştur
-        user_id = create_or_get_user(username)
+        # Kayıt veya Giriş
+        if action == "register":
+            result = register_user(username, password)
+            if not result["success"]:
+                return render_template("login.html", error=result["error"])
+            user_id = result["user_id"]
+        else:
+            result = login_user(username, password)
+            if not result["success"]:
+                return render_template("login.html", error=result["error"])
+            user_id = result["user_id"]
         
         session["username"] = username
         session["user_id"] = user_id
@@ -122,7 +182,6 @@ def login():
             user_agent=user_agent
         )
         
-        #ileride kullanıcılara level buralardan eklenecek 
         return redirect(url_for("dashboard"))
 
     # GET isteğinde direkt login sayfasını göster
@@ -268,6 +327,20 @@ def practice_word():
                     
                     # Hedef ilerlemesini senkronize et
                     goal_manager.sync_goal_progress(user_id)
+
+                    # Eğer çeviri yanlışsa mistakes tablosuna ekle
+                    try:
+                        if not result.get("is_correct"):
+                            record_mistake(
+                                user_id=user_id,
+                                item_key=english_word,
+                                wrong_answer=user_answer,
+                                correct_answer=result.get("correct_answer"),
+                                lesson_id="practice_word",
+                                context="word",
+                            )
+                    except Exception:
+                        pass
         
         # Sonra yeni bir kelime göster
         cursor.execute("SELECT word_id, english, topic_id FROM words WHERE level='A1' ORDER BY RANDOM() LIMIT 1")
@@ -316,28 +389,80 @@ def practice_sentence():
         
         if word_row:
             target_word = word_row[0]
-            # API kullanmadan basit örnek cümle oluştur (limit aşımını önlemek için)
-            example_sentence = f"Please write a sentence using the word '{target_word}'."
+            # AI ile örnek cümle oluştur
+            try:
+                example_sentence = generate_sentence(target_word)
+                # Fallback kontrolü - eğer basit mesaj dönerse düzelt
+                if not example_sentence or "using the word" in example_sentence.lower():
+                    example_sentence = f"Example: The {target_word} is very important in daily life."
+            except Exception as e:
+                print(f"generate_sentence hatası: {e}")
+                example_sentence = f"Example: I like to use the word '{target_word}' in my sentences."
 
     if request.method == "POST":
         user_sentence = request.form.get("sentence", "").strip()
         target_word = request.form.get("target_word", "")
 
         if user_sentence:
-            # 1. Rules-based grammar kontrol
+            # 1. Rules-based grammar kontrol (temel kontroller - dil, yapı vb.)
             analysis_result = analyze_sentence(user_sentence)
             
-            # 2. AI-powered grammar feedback (opsiyonel, hata yakalama ile)
-            try:
-                ai_result = grammar_feedback_json(user_sentence)
-                if ai_result and ai_result.get("mistakes"):
-                    ai_feedback = {
-                        "corrected": ai_result.get("corrected", user_sentence),
-                        "mistakes": ai_result.get("mistakes", [])
-                    }
-            except Exception as e:
-                print(f"AI Grammar hatası: {e}")
-                ai_feedback = None
+            # Eğer dil hatası varsa (Türkçe yazılmış vb.) direkt rules sonucunu kullan
+            has_language_error = any(err.get("rule") == "language_error" for err in analysis_result.get("errors", []))
+            
+            # 2. HEDEF KELİME KONTROLÜ - Cümlede hedef kelime kullanılmış mı?
+            if target_word and not has_language_error:
+                target_lower = target_word.lower().strip()
+                sentence_lower = user_sentence.lower()
+                
+                # Kelimenin cümlede olup olmadığını kontrol et
+                import re
+                word_pattern = r'\b' + re.escape(target_lower) + r'\b'
+                if not re.search(word_pattern, sentence_lower):
+                    # Hedef kelime cümlede yok
+                    analysis_result["errors"].append({
+                        "rule": "missing_target_word",
+                        "message_tr": f"Hedef kelime '{target_word}' cümlede kullanılmamış. Lütfen bu kelimeyi cümlenizde kullanın."
+                    })
+                    analysis_result["is_valid"] = False
+                    analysis_result["score"] = max(0, analysis_result["score"] - 30)
+                    analysis_result["suggestions"].append(f"'{target_word}' kelimesini cümlenizde kullanın.")
+            
+            # 3. AI-powered grammar feedback (asıl gramer kontrolü)
+            ai_feedback = None
+            if not has_language_error:
+                try:
+                    ai_result = grammar_feedback_json(user_sentence)
+                    if ai_result:
+                        ai_feedback = {
+                            "corrected": ai_result.get("corrected", user_sentence),
+                            "mistakes": ai_result.get("mistakes", [])
+                        }
+                        
+                        # AI sonucu varsa, feedback'i AI'dan al
+                        if ai_result.get("mistakes"):
+                            # AI hata buldu - feedback'i güncelle
+                            ai_errors = []
+                            for mistake in ai_result.get("mistakes", []):
+                                ai_errors.append({
+                                    "rule": "ai_grammar",
+                                    "message_tr": f"'{mistake.get('part', '')}': {mistake.get('explanation_tr', 'Gramer hatası')}"
+                                })
+                            
+                            # AI sonucunu ana feedback'e entegre et
+                            analysis_result["errors"].extend(ai_errors)
+                            analysis_result["is_valid"] = False
+                            # Score'u hata sayısına göre düşür
+                            penalty = len(ai_errors) * 15
+                            analysis_result["score"] = max(0, analysis_result["score"] - penalty)
+                            analysis_result["suggestions"].append(f"Düzeltilmiş hali: {ai_result.get('corrected', user_sentence)}")
+                        else:
+                            # AI hata bulmadı ve rules da hata bulmadıysa başarılı
+                            if analysis_result["is_valid"]:
+                                analysis_result["score"] = 100
+                except Exception as e:
+                    print(f"AI Grammar hatası: {e}")
+                    # AI başarısız olursa rules sonucuyla devam et
             
             feedback = {
                 "is_valid": analysis_result["is_valid"],
@@ -347,6 +472,7 @@ def practice_sentence():
             }
             
             # Veritabanında hataları kaydet
+            conn = None
             try:
                 conn = get_db_connection()
                 cursor = conn.cursor()
@@ -397,10 +523,33 @@ def practice_sentence():
                     goal_manager.sync_goal_progress(user_id)
                 
                 conn.commit()
-                conn.close()
                 
             except Exception as e:
                 print(f"❌ DB logging hatası: {e}")
+            finally:
+                # Database bağlantısını her durumda kapat
+                if conn:
+                    try:
+                        conn.close()
+                    except:
+                        pass
+            
+            # Eğer kurallar veya LLM kontrolünde hata varsa, mistakes tablosuna ekle
+            try:
+                has_rules_error = analysis_result and not analysis_result.get("is_valid")
+                has_llm_mistakes = ai_feedback and bool(ai_feedback.get("mistakes"))
+                if user_id and (has_rules_error or has_llm_mistakes):
+                    correct = (ai_feedback.get("corrected") if ai_feedback else None) or example_sentence or target_word
+                    record_mistake(
+                        user_id=user_id,
+                        item_key=target_word or user_sentence[:30],
+                        wrong_answer=user_sentence,
+                        correct_answer=correct,
+                        lesson_id="practice_sentence",
+                        context="sentence",
+                    )
+            except Exception:
+                pass
             
     return render_template(
         "practice_sentence.html",
@@ -510,6 +659,19 @@ def pronunciation():
                 ip_address=request.remote_addr,
                 user_agent=request.headers.get('User-Agent')
             )
+            # Eğer telaffuz yanlışsa mistakes tablosuna ekle
+            try:
+                if not is_correct:
+                    record_mistake(
+                        user_id=user_id,
+                        item_key=target_word,
+                        wrong_answer=recognized_text or "",
+                        correct_answer=target_word,
+                        lesson_id="pronunciation",
+                        context="pronunciation",
+                    )
+            except Exception:
+                pass
     
     else:
         # GET isteğinde yeni rastgele kelime al
@@ -580,6 +742,149 @@ def review_submit():
         print(f"Review submit error: {e}")
 
     return redirect(url_for("review_quiz"))
+
+
+@app.route("/review/seed", methods=["GET"]) 
+def review_seed():
+    """Seed some sample mistakes for the current user and redirect to /review."""
+    username = session.get("username")
+    if not username:
+        return redirect(url_for("login"))
+
+    user_id = session.get("user_id")
+    try:
+        # A few example mistakes to display in the review UI
+        record_mistake(user_id=user_id, item_key="banana", wrong_answer="bananna", correct_answer="banana", lesson_id="seed-1", context="sentence")
+        record_mistake(user_id=user_id, item_key="apple", wrong_answer="appel", correct_answer="apple", lesson_id="seed-1", context="pronunciation")
+        record_mistake(user_id=user_id, item_key="orange", wrong_answer="oragne", correct_answer="orange", lesson_id="seed-1", context="sentence")
+    except Exception as e:
+        print(f"Seed error: {e}")
+
+    return redirect(url_for("review_quiz"))
+
+
+@app.route("/my-mistakes")
+def my_mistakes():
+    username = session.get("username")
+    if not username:
+        return redirect(url_for("login"))
+
+    user_id = session.get("user_id")
+    mistakes = []
+    try:
+        raw_mistakes = get_user_mistakes(user_id=user_id, limit=200)
+        # sqlite3.Row'ları dict'e dönüştür
+        for mistake_row in raw_mistakes:
+            # Row nesnesini dict'e çevir
+            mistake = dict(mistake_row) if hasattr(mistake_row, 'keys') else mistake_row
+            
+            try:
+                feedback = mistake_feedback(
+                    wrong_answer=mistake.get("wrong_answer", ""),
+                    correct_answer=mistake.get("correct_answer", ""),
+                    context=mistake.get("context", "sentence")
+                )
+                mistake["ai_feedback"] = feedback
+            except Exception as e:
+                print(f"❌ Mistake feedback error for {mistake.get('mistake_id')}: {e}")
+                # Fallback geri bildirim
+                mistake["ai_feedback"] = {
+                    "explanation": "Geri bildirim şu anda alınamadı, lütfen daha sonra tekrar deneyin.",
+                    "tips": ["Doğru cevabı dikkatlice inceleyerek öğrenmeye devam et"],
+                    "example": mistake.get("correct_answer", ""),
+                    "practice_sentence": ""
+                }
+            
+            mistakes.append(mistake)
+    except Exception as e:
+        print(f"❌ Get user mistakes error: {e}")
+        import traceback
+        traceback.print_exc()
+
+    return render_template("my_mistakes.html", username=username, mistakes=mistakes)
+
+
+# API: Hata için LLM geri bildirimi al
+@app.route("/api/mistake-feedback", methods=["POST"])
+def api_mistake_feedback():
+    """
+    JSON gövdesinden wrong_answer, correct_answer ve context alır.
+    LLM'den geri bildirim üretir ve JSON olarak döndürür.
+    
+    Request örneği:
+    {
+      "wrong_answer": "I go yesterday",
+      "correct_answer": "I went yesterday",
+      "context": "sentence"
+    }
+    """
+    try:
+        data = request.get_json()
+        if not data:
+            return jsonify({"error": "No JSON body"}), 400
+        
+        wrong_answer = data.get("wrong_answer", "")
+        correct_answer = data.get("correct_answer", "")
+        context = data.get("context", "sentence")
+        
+        if not wrong_answer or not correct_answer:
+            return jsonify({"error": "Missing required fields"}), 400
+        
+        # LLM feedback'ini al
+        feedback = mistake_feedback(
+            wrong_answer=wrong_answer,
+            correct_answer=correct_answer,
+            context=context
+        )
+        
+        return jsonify({
+            "success": True,
+            "feedback": feedback
+        })
+    
+    except Exception as e:
+        print(f"❌ Mistake feedback API error: {e}")
+        return jsonify({
+            "success": False,
+            "error": str(e)
+        }), 500
+
+
+# DEBUG: Test LLM feedback
+@app.route("/api/test-feedback", methods=["GET"])
+def api_test_feedback():
+    """Test endpoint - feedback fonksiyonunun çalışıp çalışmadığını kontrol et"""
+    try:
+        import traceback
+        print("\n" + "="*60)
+        print("TEST: mistake_feedback fonksiyonu çağrılıyor")
+        print("="*60)
+        
+        test_feedback = mistake_feedback(
+            wrong_answer="I go to school yesterday",
+            correct_answer="I went to school yesterday",
+            context="sentence"
+        )
+        
+        print(f"✅ Feedback başarıyla oluşturuldu: {type(test_feedback)}")
+        print(f"Feedback data: {test_feedback}")
+        
+        return jsonify({
+            "success": True,
+            "status": "Feedback başarıyla oluşturuldu",
+            "feedback": test_feedback,
+            "keys": list(test_feedback.keys()) if isinstance(test_feedback, dict) else []
+        })
+    except Exception as e:
+        import traceback
+        error_msg = traceback.format_exc()
+        print(f"❌ Hata: {e}")
+        print(error_msg)
+        return jsonify({
+            "success": False,
+            "error": str(e),
+            "traceback": error_msg
+        }), 500
 
 
 # API: Ses dosyası al ve STT yap
@@ -768,13 +1073,17 @@ def notifications():
     user_id = session.get("user_id")
     
     # Bildirimleri al
-    notifications = notification_manager.get_user_notifications(user_id, limit=50)
+    notif_list = notification_manager.get_user_notifications(user_id, limit=50)
     unread_count = notification_manager.get_unread_notification_count(user_id)
+    
+    # DEBUG
+    print(f"[DEBUG] user_id: {user_id}, notifications count: {len(notif_list)}, unread: {unread_count}")
+    print(f"[DEBUG] notifications: {notif_list}")
     
     return render_template(
         "notifications.html",
         username=username,
-        notifications=notifications,
+        notifications=notif_list,
         unread_count=unread_count
     )
 
@@ -836,9 +1145,21 @@ def add_friend(friend_id):
     if not user_id:
         return redirect(url_for("login"))
     
-    social_manager.add_friend(user_id, friend_id)
-    
-    return redirect(request.referrer or url_for("friends"))
+    # JSON isteği kontrol et
+    if request.is_json:
+        result = social_manager.add_friend(user_id, friend_id)
+        return jsonify(result)
+    else:
+        # Form isteği
+        result = social_manager.add_friend(user_id, friend_id)
+        
+        # Sonucu session'a kaydet
+        if result.get('success'):
+            flash(result.get('message', 'Arkadaş isteği gönderildi!'), 'success')
+        else:
+            flash(result.get('message', 'Arkadaş eklenemedi!'), 'error')
+        
+        return redirect(request.referrer or url_for("friends"))
 
 @app.route("/friend-request/<int:friendship_id>/confirm", methods=["POST"])
 def confirm_friend_request(friendship_id):
@@ -1172,6 +1493,99 @@ def custom_lesson():
                           error_message=error_message)
 
 
+# ==================== SEVİYE BELİRLEME TESTİ ====================
+
+@app.route("/placement-test")
+def placement_test():
+    """Seviye belirleme testi sayfasi - kapsamli test."""
+    if "username" not in session:
+        return redirect(url_for("login"))
+    
+    username = session["username"]
+    user_id = get_user_id(username)
+    
+    # Kullanıcı zaten testi yapmışsa, direkt learn sayfasına yönlendir
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute("SELECT placement_test_done FROM users WHERE user_id = ?", (user_id,))
+    row = cursor.fetchone()
+    conn.close()
+    
+    if row and row[0] == 1:
+        return redirect(url_for("learn"))
+    
+    import random
+    
+    # Her seviyeden farkli soru tipleri olustur
+    questions = []
+    levels = ['A1', 'A2', 'B1', 'B2']
+    question_types = ['vocabulary', 'listening', 'translation', 'grammar', 'pronunciation']
+    
+    for level in levels:
+        # Her seviyeden farkli tiplerden sorular
+        for i, q_type in enumerate(question_types):
+            try:
+                # Her tipten 1 soru (pronunciation dahil)
+                count = 1
+                level_questions = course_system._generate_questions(q_type, level, count)
+                for q in level_questions:
+                    q['level'] = level
+                questions.extend(level_questions)
+            except Exception as e:
+                print(f"Soru olusturma hatasi ({level}, {q_type}): {e}")
+    
+    # Soruları seviye sirasina gore grupla
+    grouped = {}
+    for q in questions:
+        level = q.get('level', 'A1')
+        if level not in grouped:
+            grouped[level] = []
+        grouped[level].append(q)
+    
+    # Her grubu kendi icinde karistir ve sirala
+    final_questions = []
+    for level in levels:
+        if level in grouped:
+            random.shuffle(grouped[level])
+            final_questions.extend(grouped[level])
+    
+    return render_template("placement_test.html", 
+                          username=username,
+                          questions=final_questions)
+
+
+@app.route("/placement-test/save", methods=["POST"])
+def save_placement_result():
+    """Seviye belirleme sonucunu kaydet."""
+    if "username" not in session:
+        return jsonify({"error": "Unauthorized"}), 401
+    
+    username = session["username"]
+    user_id = get_user_id(username)
+    
+    data = request.get_json()
+    level = data.get("level", "A1")
+    
+    # Geçerli seviye kontrolü
+    if level not in ['A1', 'A2', 'B1', 'B2']:
+        level = 'A1'
+    
+    # Kullanıcı seviyesini ve placement_test_done'u güncelle
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute("""
+        UPDATE users SET level = ?, placement_test_done = 1 
+        WHERE user_id = ?
+    """, (level, user_id))
+    conn.commit()
+    conn.close()
+    
+    # Kurs ilerlemesini belirlenen seviyeden başlat
+    course_system.init_user_progress(user_id, level)
+    
+    return jsonify({"success": True, "level": level})
+
+
 # ==================== YENİ KURS SİSTEMİ ====================
 
 @app.route("/learn")
@@ -1182,6 +1596,17 @@ def learn():
     
     username = session["username"]
     user_id = get_user_id(username)
+    
+    # Placement test yapılmış mı kontrol et
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute("SELECT placement_test_done FROM users WHERE user_id = ?", (user_id,))
+    row = cursor.fetchone()
+    conn.close()
+    
+    # Eğer placement test yapılmamışsa, teste yönlendir
+    if not row or not row[0]:
+        return redirect(url_for("placement_test"))
     
     # Kurs haritasını al
     course_map = course_system.get_user_course_map(user_id)
@@ -1263,6 +1688,39 @@ def api_complete_lesson():
     return jsonify(result)
 
 
+@app.route("/api/learn/record-mistake", methods=["POST"])
+def api_record_lesson_mistake():
+    """Ders sırasında yapılan hatayı kaydet."""
+    if "username" not in session:
+        return jsonify({"success": False, "error": "Giriş yapmalısınız"})
+    
+    user_id = get_user_id(session["username"])
+    data = request.get_json()
+    
+    item_key = data.get("item_key", "")  # Soru/kelime
+    wrong_answer = data.get("wrong_answer", "")
+    correct_answer = data.get("correct_answer", "")
+    lesson_id = data.get("lesson_id", "learn")
+    context = data.get("context", "lesson")  # lesson, vocabulary, grammar, listening
+    
+    if not item_key or not correct_answer:
+        return jsonify({"success": False, "error": "Eksik bilgi"})
+    
+    try:
+        mistake_id = record_mistake(
+            user_id=user_id,
+            item_key=item_key,
+            wrong_answer=wrong_answer,
+            correct_answer=correct_answer,
+            lesson_id=str(lesson_id),
+            context=context
+        )
+        return jsonify({"success": True, "mistake_id": mistake_id})
+    except Exception as e:
+        print(f"❌ Hata kaydetme hatası: {e}")
+        return jsonify({"success": False, "error": str(e)})
+
+
 @app.route("/api/learn/course-map")
 def api_course_map():
     """Kurs haritası API."""
@@ -1273,10 +1731,39 @@ def api_course_map():
     course_map = course_system.get_user_course_map(user_id)
     return jsonify(course_map)
 
+
+@app.route("/api/check-grammar", methods=["POST"])
+def api_check_grammar():
+    """Kullanıcının yazdığı cümleyi LLM ile kontrol et."""
+    if "username" not in session:
+        return jsonify({"error": "Giriş yapmalısınız"}), 401
+    
+    data = request.get_json()
+    sentence = data.get("sentence", "").strip()
+    target_word = data.get("target_word", "").strip()
+    
+    if not sentence:
+        return jsonify({"error": "Cümle boş olamaz"}), 400
+    
+    try:
+        # LLM ile gramer kontrolü yap
+        result = grammar_feedback_json(sentence)
+        
+        # Hedef kelime cümlede var mı kontrol et
+        word_used = target_word.lower() in sentence.lower() if target_word else True
+        
+        # Sonucu döndür
+        return jsonify({
+            "success": True,
+            "corrected": result.get("corrected", sentence),
+            "mistakes": result.get("mistakes", []),
+            "word_used": word_used,
+            "is_correct": len(result.get("mistakes", [])) == 0 and word_used
+        })
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
     
 if __name__ == "__main__":
     app.run(debug=True)
-
-
-
 

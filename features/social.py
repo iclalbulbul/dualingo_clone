@@ -20,14 +20,19 @@ class SocialManager:
     
     # ==================== ARKADAŞ YÖNETİMİ ====================
     
-    def add_friend(self, user_id: int, friend_id: int) -> bool:
+    def add_friend(self, user_id: int, friend_id: int) -> dict:
         """
         Arkadaş ekle (karşılıklı).
+        Returns: {'success': bool, 'message': str}
         """
         conn = get_db_connection()
         cursor = conn.cursor()
         
         try:
+            # Kendine arkadaş ekleme kontrolü
+            if user_id == friend_id:
+                return {'success': False, 'message': 'Kendini arkadaş olarak ekleyemezsin!'}
+            
             # Tablo oluştur
             cursor.execute("""
                 CREATE TABLE IF NOT EXISTS friends (
@@ -43,6 +48,20 @@ class SocialManager:
                 )
             """)
             
+            # Zaten istek var mı kontrol et
+            cursor.execute("""
+                SELECT friendship_id, status FROM friends 
+                WHERE user_id = ? AND friend_id = ?
+            """, (user_id, friend_id))
+            existing = cursor.fetchone()
+            
+            if existing:
+                existing_id, status = existing
+                if status == 'pending':
+                    return {'success': False, 'message': 'Zaten arkadaş isteği gönderdin!'}
+                elif status == 'confirmed':
+                    return {'success': False, 'message': 'Zaten arkadaşsınız!'}
+            
             # İstek gönder
             cursor.execute("""
                 INSERT OR IGNORE INTO friends 
@@ -55,23 +74,25 @@ class SocialManager:
             
             # Bildirim gönder
             cursor.execute("SELECT username FROM users WHERE user_id = ?", (user_id,))
-            requester_name = cursor.fetchone()[0]
+            requester_data = cursor.fetchone()
+            if requester_data:
+                requester_name = requester_data[0]
+                
+                self.notif_mgr.create_notification(
+                    user_id=friend_id,
+                    notification_type='friend_request',
+                    title='Arkadaş İsteği',
+                    message=f'{requester_name} seni arkadaş olarak ekledi',
+                    icon='👥',
+                    action_url=f'/profile/{user_id}',
+                    metadata={'from_user_id': user_id}
+                )
             
-            self.notif_mgr.create_notification(
-                user_id=friend_id,
-                notification_type='friend_request',
-                title='Arkadaş İsteği',
-                message=f'{requester_name} seni arkadaş olarak ekledi',
-                icon='👥',
-                action_url=f'/user/{user_id}',
-                metadata={'from_user_id': user_id}
-            )
-            
-            return True
+            return {'success': True, 'message': 'Arkadaş isteği gönderildi!'}
         
         except Exception as e:
             print(f"❌ Arkadaş ekleme hatası: {e}")
-            return False
+            return {'success': False, 'message': f'Hata: {str(e)}'}
         finally:
             conn.close()
     
@@ -252,7 +273,7 @@ class SocialManager:
                     title=f'{user_name} başarısı kazandı!',
                     message=f'{user_name} "{achievement_name}" başarısını açıklarındı',
                     icon='🎉',
-                    action_url=f'/user/{user_id}',
+                    action_url=f'/profile/{user_id}',
                     metadata={'achievement': achievement_name, 'user_id': user_id}
                 )
             
@@ -431,8 +452,8 @@ class SocialManager:
                     sg.group_id,
                     sg.group_name,
                     sg.description,
-                    sg.member_count,
-                    sg.is_public,
+                    COALESCE(sg.member_count, 1) as member_count,
+                    CASE WHEN sg.is_private = 0 THEN 1 ELSE 0 END as is_public,
                     gm.role,
                     sg.created_at
                 FROM study_groups sg

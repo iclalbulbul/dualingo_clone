@@ -12,7 +12,21 @@ import sqlite3
 from typing import Optional, Dict, List, Tuple, Any
 from datetime import datetime, timedelta
 import json
+import time
 from db_utils import DB_PATH, get_db_connection
+
+
+def _retry_on_locked(func, max_retries=3, delay=0.5):
+    """Database locked hatası durumunda retry yapar."""
+    for attempt in range(max_retries):
+        try:
+            return func()
+        except sqlite3.OperationalError as e:
+            if "locked" in str(e).lower() and attempt < max_retries - 1:
+                time.sleep(delay * (attempt + 1))
+                continue
+            raise
+    return None
 
 
 class UserInputLogger:
@@ -52,34 +66,36 @@ class UserInputLogger:
         Returns:
             Kaydedilen input'un ID'si
         """
-        conn = get_db_connection()
-        cursor = conn.cursor()
-        
         metadata_json = json.dumps(metadata) if metadata else None
         
-        try:
-            cursor.execute("""
-                INSERT INTO user_inputs 
-                (user_id, input_type, input_text, response_text, is_correct, score, 
-                 word_id, sentence_id, timestamp, metadata)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-            """, (
-                user_id, input_type, input_text, response_text, 
-                is_correct, score, word_id, sentence_id, 
-                datetime.now().isoformat(), metadata_json
-            ))
-            
-            conn.commit()
-            input_id = cursor.lastrowid
-            print(f"✓ Input kaydedildi [ID: {input_id}]")
-            return input_id
+        def do_insert():
+            conn = get_db_connection()
+            cursor = conn.cursor()
+            try:
+                cursor.execute("""
+                    INSERT INTO user_inputs 
+                    (user_id, input_type, input_text, response_text, is_correct, score, 
+                     word_id, sentence_id, timestamp, metadata)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """, (
+                    user_id, input_type, input_text, response_text, 
+                    is_correct, score, word_id, sentence_id, 
+                    datetime.now().isoformat(), metadata_json
+                ))
+                conn.commit()
+                input_id = cursor.lastrowid
+                return input_id
+            finally:
+                conn.close()
         
+        try:
+            input_id = _retry_on_locked(do_insert)
+            if input_id:
+                print(f"✓ Input kaydedildi [ID: {input_id}]")
+            return input_id or -1
         except Exception as e:
             print(f"❌ Input kaydetme hatası: {e}")
-            conn.rollback()
             return -1
-        finally:
-            conn.close()
     
     # ==================== USER ACTION LOG ====================
     
@@ -106,29 +122,28 @@ class UserInputLogger:
         Returns:
             Kaydedilen aksiyon ID'si
         """
-        conn = get_db_connection()
-        cursor = conn.cursor()
+        def do_insert():
+            conn = get_db_connection()
+            cursor = conn.cursor()
+            try:
+                cursor.execute("""
+                    INSERT INTO user_actions 
+                    (user_id, action_type, action_details, page, ip_address, user_agent, timestamp)
+                    VALUES (?, ?, ?, ?, ?, ?, ?)
+                """, (
+                    user_id, action_type, action_details, page, 
+                    ip_address, user_agent, datetime.now().isoformat()
+                ))
+                conn.commit()
+                return cursor.lastrowid
+            finally:
+                conn.close()
         
         try:
-            cursor.execute("""
-                INSERT INTO user_actions 
-                (user_id, action_type, action_details, page, ip_address, user_agent, timestamp)
-                VALUES (?, ?, ?, ?, ?, ?, ?)
-            """, (
-                user_id, action_type, action_details, page, 
-                ip_address, user_agent, datetime.now().isoformat()
-            ))
-            
-            conn.commit()
-            action_id = cursor.lastrowid
-            return action_id
-        
+            return _retry_on_locked(do_insert) or -1
         except Exception as e:
             print(f"❌ Aksiyon kaydetme hatası: {e}")
-            conn.rollback()
             return -1
-        finally:
-            conn.close()
     
     # ==================== SESSION LOG ====================
     
@@ -141,30 +156,31 @@ class UserInputLogger:
         """
         Kullanıcı oturum açışını kaydı.
         """
-        conn = get_db_connection()
-        cursor = conn.cursor()
+        def do_insert():
+            conn = get_db_connection()
+            cursor = conn.cursor()
+            try:
+                cursor.execute("""
+                    INSERT INTO session_logs 
+                    (user_id, login_time, ip_address, device_info)
+                    VALUES (?, ?, ?, ?)
+                """, (
+                    user_id, datetime.now().isoformat(), 
+                    ip_address, device_info
+                ))
+                conn.commit()
+                return cursor.lastrowid
+            finally:
+                conn.close()
         
         try:
-            cursor.execute("""
-                INSERT INTO session_logs 
-                (user_id, login_time, ip_address, device_info)
-                VALUES (?, ?, ?, ?)
-            """, (
-                user_id, datetime.now().isoformat(), 
-                ip_address, device_info
-            ))
-            
-            conn.commit()
-            session_id = cursor.lastrowid
-            print(f"✓ Oturum başladı [Session ID: {session_id}]")
-            return session_id
-        
+            session_id = _retry_on_locked(do_insert)
+            if session_id:
+                print(f"✓ Oturum başladı [Session ID: {session_id}]")
+            return session_id or -1
         except Exception as e:
             print(f"❌ Oturum kaydetme hatası: {e}")
-            conn.rollback()
             return -1
-        finally:
-            conn.close()
     
     def log_session_end(
         self,
