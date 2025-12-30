@@ -12,7 +12,8 @@ NOT: Buyuk kelime importlari ayri bir importer scripti ile yapilmali (chunking o
 
 import os
 import sqlite3
-from typing import List
+from typing import List, Generator
+from contextlib import contextmanager
 import threading
 from datetime import datetime, timedelta
 
@@ -33,13 +34,47 @@ def _connect():
 
 
 def get_db_connection():
-	"""Veritabani baglantisi dondur."""
+	"""Veritabani baglantisi dondur. 
+	DEPRECATED: Yeni kodlarda get_db() context manager kullanın."""
 	conn = sqlite3.connect(DB_PATH, timeout=60, check_same_thread=False)
 	conn.execute("PRAGMA journal_mode=WAL")
 	conn.execute("PRAGMA busy_timeout=60000")
 	conn.execute("PRAGMA synchronous=NORMAL")
 	conn.row_factory = sqlite3.Row
 	return conn
+
+
+@contextmanager
+def get_db() -> Generator[sqlite3.Connection, None, None]:
+	"""
+	Context manager ile güvenli veritabanı bağlantısı.
+	
+	Kullanım:
+		with get_db() as conn:
+			cursor = conn.cursor()
+			cursor.execute("SELECT * FROM users")
+			# Otomatik commit ve close
+	
+	Avantajlar:
+		- Otomatik commit (hata yoksa)
+		- Otomatik rollback (hata varsa)
+		- Otomatik close (her durumda)
+		- Database locked hatası minimize edilir
+	"""
+	conn = sqlite3.connect(DB_PATH, timeout=60, check_same_thread=False)
+	conn.execute("PRAGMA journal_mode=WAL")
+	conn.execute("PRAGMA busy_timeout=60000")
+	conn.execute("PRAGMA synchronous=NORMAL")
+	conn.row_factory = sqlite3.Row
+	
+	try:
+		yield conn
+		conn.commit()
+	except Exception as e:
+		conn.rollback()
+		raise
+	finally:
+		conn.close()
 
 
 def init_db():
@@ -458,96 +493,84 @@ def seed_topics_from_repo(repo_data_dir: str = None) -> int:
 
 def get_user_id(username: str):
 	"""Kullanici adindan user_id dondur."""
-	conn = get_db_connection()
-	cursor = conn.cursor()
-	cursor.execute("SELECT user_id FROM users WHERE username = ?", (username,))
-	row = cursor.fetchone()
-	conn.close()
-	return row[0] if row else None
+	with get_db() as conn:
+		cursor = conn.cursor()
+		cursor.execute("SELECT user_id FROM users WHERE username = ?", (username,))
+		row = cursor.fetchone()
+		return row[0] if row else None
 
 
 def create_or_get_user(username: str) -> int:
 	"""Kullanici varsa ID dondur, yoksa olustur."""
-	conn = get_db_connection()
-	cursor = conn.cursor()
-	
-	cursor.execute("SELECT user_id FROM users WHERE username = ?", (username,))
-	row = cursor.fetchone()
-	
-	if row:
-		user_id = row[0]
-	else:
-		cursor.execute("INSERT INTO users (username, level) VALUES (?, ?)", (username, 'A1'))
-		user_id = cursor.lastrowid
-	
-	conn.commit()
-	conn.close()
-	return user_id
+	with get_db() as conn:
+		cursor = conn.cursor()
+		
+		cursor.execute("SELECT user_id FROM users WHERE username = ?", (username,))
+		row = cursor.fetchone()
+		
+		if row:
+			return row[0]
+		else:
+			cursor.execute("INSERT INTO users (username, level) VALUES (?, ?)", (username, 'A1'))
+			return cursor.lastrowid
 
 
 def register_user(username: str, password: str) -> dict:
 	"""Yeni kullanici kaydi olustur."""
 	import hashlib
-	conn = get_db_connection()
-	cursor = conn.cursor()
 	
-	# Kullanıcı adı var mı kontrol et
-	cursor.execute("SELECT user_id FROM users WHERE username = ?", (username,))
-	if cursor.fetchone():
-		conn.close()
-		return {"success": False, "error": "Bu kullanıcı adı zaten kullanılıyor."}
-	
-	# Şifreyi hashle
-	password_hash = hashlib.sha256(password.encode()).hexdigest()
-	
-	# Kullanıcı oluştur
-	cursor.execute(
-		"INSERT INTO users (username, password_hash, level) VALUES (?, ?, ?)",
-		(username, password_hash, 'A1')
-	)
-	user_id = cursor.lastrowid
-	
-	conn.commit()
-	conn.close()
-	return {"success": True, "user_id": user_id}
+	with get_db() as conn:
+		cursor = conn.cursor()
+		
+		# Kullanıcı adı var mı kontrol et
+		cursor.execute("SELECT user_id FROM users WHERE username = ?", (username,))
+		if cursor.fetchone():
+			return {"success": False, "error": "Bu kullanıcı adı zaten kullanılıyor."}
+		
+		# Şifreyi hashle
+		password_hash = hashlib.sha256(password.encode()).hexdigest()
+		
+		# Kullanıcı oluştur
+		cursor.execute(
+			"INSERT INTO users (username, password_hash, level) VALUES (?, ?, ?)",
+			(username, password_hash, 'A1')
+		)
+		user_id = cursor.lastrowid
+		
+		return {"success": True, "user_id": user_id}
 
 
 def login_user(username: str, password: str) -> dict:
 	"""Kullanici girisi yap."""
 	import hashlib
-	conn = get_db_connection()
-	cursor = conn.cursor()
 	
-	# Kullanıcıyı bul
-	cursor.execute("SELECT user_id, password_hash FROM users WHERE username = ?", (username,))
-	row = cursor.fetchone()
-	
-	if not row:
-		conn.close()
-		return {"success": False, "error": "Kullanıcı bulunamadı."}
-	
-	user_id, stored_hash = row
-	
-	# Eski kullanıcılar için (şifresi olmayan)
-	if not stored_hash:
-		# İlk giriş - şifreyi ayarla
+	with get_db() as conn:
+		cursor = conn.cursor()
+		
+		# Kullanıcıyı bul
+		cursor.execute("SELECT user_id, password_hash FROM users WHERE username = ?", (username,))
+		row = cursor.fetchone()
+		
+		if not row:
+			return {"success": False, "error": "Kullanıcı bulunamadı."}
+		
+		user_id, stored_hash = row
+		
+		# Eski kullanıcılar için (şifresi olmayan)
+		if not stored_hash:
+			# İlk giriş - şifreyi ayarla
+			password_hash = hashlib.sha256(password.encode()).hexdigest()
+			cursor.execute("UPDATE users SET password_hash = ? WHERE user_id = ?", (password_hash, user_id))
+			return {"success": True, "user_id": user_id, "message": "Şifreniz kaydedildi."}
+		
+		# Şifreyi kontrol et
 		password_hash = hashlib.sha256(password.encode()).hexdigest()
-		cursor.execute("UPDATE users SET password_hash = ? WHERE user_id = ?", (password_hash, user_id))
-		conn.commit()
-		conn.close()
-		return {"success": True, "user_id": user_id, "message": "Şifreniz kaydedildi."}
-	
-	# Şifreyi kontrol et
-	password_hash = hashlib.sha256(password.encode()).hexdigest()
-	if password_hash != stored_hash:
-		conn.close()
-		return {"success": False, "error": "Şifre yanlış."}
-	
-	# Son giriş zamanını güncelle
-	cursor.execute("UPDATE users SET last_login = CURRENT_TIMESTAMP WHERE user_id = ?", (user_id,))
-	conn.commit()
-	conn.close()
-	return {"success": True, "user_id": user_id}
+		if password_hash != stored_hash:
+			return {"success": False, "error": "Şifre yanlış."}
+		
+		# Son giriş zamanını güncelle
+		cursor.execute("UPDATE users SET last_login = CURRENT_TIMESTAMP WHERE user_id = ?", (user_id,))
+		return {"success": True, "user_id": user_id}
 
 
 def record_mistake(user_id: int, item_key: str, wrong_answer: str, correct_answer: str, lesson_id: str = None, context: str = None):
@@ -555,44 +578,41 @@ def record_mistake(user_id: int, item_key: str, wrong_answer: str, correct_answe
 	Varsa count arttirilir, yoksa yeni satir eklenir.
 	Doner: mistake_id.
 	"""
-	conn = get_db_connection()
-	cur = conn.cursor()
-	cur.execute("SELECT mistake_id FROM mistakes WHERE user_id = ? AND item_key = ?", (user_id, item_key))
-	row = cur.fetchone()
-	now = datetime.utcnow().isoformat(sep=' ')
-	if row:
-		mistake_id = row[0]
-		cur.execute(
-			"""UPDATE mistakes SET count = count + 1, wrong_answer = ?, correct_answer = ?, last_seen = ?, lesson_id = ?, context = ? WHERE mistake_id = ?""",
-			(wrong_answer, correct_answer, now, lesson_id, context, mistake_id)
-		)
-	else:
-		cur.execute(
-			"""INSERT INTO mistakes (user_id, item_key, lesson_id, context, wrong_answer, correct_answer, last_seen, created_at, next_review)
-			VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)""",
-			(user_id, item_key, lesson_id, context, wrong_answer, correct_answer, now, now, now)
-		)
-		mistake_id = cur.lastrowid
-
-	conn.commit()
-	conn.close()
-	return mistake_id
+	with get_db() as conn:
+		cur = conn.cursor()
+		cur.execute("SELECT mistake_id FROM mistakes WHERE user_id = ? AND item_key = ?", (user_id, item_key))
+		row = cur.fetchone()
+		now = datetime.utcnow().isoformat(sep=' ')
+		if row:
+			mistake_id = row[0]
+			cur.execute(
+				"""UPDATE mistakes SET count = count + 1, wrong_answer = ?, correct_answer = ?, last_seen = ?, lesson_id = ?, context = ? WHERE mistake_id = ?""",
+				(wrong_answer, correct_answer, now, lesson_id, context, mistake_id)
+			)
+		else:
+			cur.execute(
+				"""INSERT INTO mistakes (user_id, item_key, lesson_id, context, wrong_answer, correct_answer, last_seen, created_at, next_review)
+				VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+				(user_id, item_key, lesson_id, context, wrong_answer, correct_answer, now, now, now)
+			)
+			mistake_id = cur.lastrowid
+		
+		return mistake_id
 
 
 def get_due_mistakes(user_id: int, limit: int = 20) -> List[dict]:
 	"""next_review zamani gelen veya NULL olan hatalari dondurur (oncelik: next_review, sonra count).
 	Donen liste dict satirlardan olusur.
 	"""
-	conn = get_db_connection()
-	cur = conn.cursor()
-	now = datetime.utcnow().isoformat(sep=' ')
-	cur.execute(
-		"""SELECT * FROM mistakes WHERE user_id = ? AND (next_review IS NULL OR next_review <= ?) ORDER BY next_review ASC, count DESC LIMIT ?""",
-		(user_id, now, limit)
-	)
-	rows = cur.fetchall()
-	conn.close()
-	return [dict(r) for r in rows]
+	with get_db() as conn:
+		cur = conn.cursor()
+		now = datetime.utcnow().isoformat(sep=' ')
+		cur.execute(
+			"""SELECT * FROM mistakes WHERE user_id = ? AND (next_review IS NULL OR next_review <= ?) ORDER BY next_review ASC, count DESC LIMIT ?""",
+			(user_id, now, limit)
+		)
+		rows = cur.fetchall()
+		return [dict(r) for r in rows]
 
 
 def update_review_result(user_id: int, item_key: str, quality: int):
@@ -604,67 +624,63 @@ def update_review_result(user_id: int, item_key: str, quality: int):
 	if quality > 5:
 		quality = 5
 
-	conn = get_db_connection()
-	cur = conn.cursor()
-	cur.execute("SELECT mistake_id, repetition, interval, easiness FROM mistakes WHERE user_id = ? AND item_key = ?", (user_id, item_key))
-	row = cur.fetchone()
-	if not row:
-		conn.close()
-		return None
+	with get_db() as conn:
+		cur = conn.cursor()
+		cur.execute("SELECT mistake_id, repetition, interval, easiness FROM mistakes WHERE user_id = ? AND item_key = ?", (user_id, item_key))
+		row = cur.fetchone()
+		if not row:
+			return None
 
-	mistake_id = row[0]
-	repetition = row[1] or 0
-	interval = row[2] or 0
-	easiness = row[3] or 2.5
+		mistake_id = row[0]
+		repetition = row[1] or 0
+		interval = row[2] or 0
+		easiness = row[3] or 2.5
 
-	if quality < 3:
-		repetition = 0
-		interval = 1
-	else:
-		if repetition == 0:
+		if quality < 3:
+			repetition = 0
 			interval = 1
-		elif repetition == 1:
-			interval = 6
 		else:
-			interval = max(1, round(interval * easiness))
-		repetition += 1
+			if repetition == 0:
+				interval = 1
+			elif repetition == 1:
+				interval = 6
+			else:
+				interval = max(1, round(interval * easiness))
+			repetition += 1
 
-	# easiness güncellemesi (SM-2 formülü)
-	new_easiness = easiness + 0.1 - (5 - quality) * (0.08 + (5 - quality) * 0.02)
-	if new_easiness < 1.3:
-		new_easiness = 1.3
+		# easiness güncellemesi (SM-2 formülü)
+		new_easiness = easiness + 0.1 - (5 - quality) * (0.08 + (5 - quality) * 0.02)
+		if new_easiness < 1.3:
+			new_easiness = 1.3
 
-	next_review_dt = datetime.utcnow() + timedelta(days=interval)
-	next_review = next_review_dt.isoformat(sep=' ')
-	now = datetime.utcnow().isoformat(sep=' ')
+		next_review_dt = datetime.utcnow() + timedelta(days=interval)
+		next_review = next_review_dt.isoformat(sep=' ')
+		now = datetime.utcnow().isoformat(sep=' ')
 
-	cur.execute(
-		"""UPDATE mistakes SET repetition = ?, interval = ?, easiness = ?, next_review = ?, last_seen = ? WHERE mistake_id = ?""",
-		(repetition, interval, new_easiness, next_review, now, mistake_id)
-	)
+		cur.execute(
+			"""UPDATE mistakes SET repetition = ?, interval = ?, easiness = ?, next_review = ?, last_seen = ? WHERE mistake_id = ?""",
+			(repetition, interval, new_easiness, next_review, now, mistake_id)
+		)
 
-	conn.commit()
-	conn.close()
-	return {
-		"mistake_id": mistake_id,
-		"repetition": repetition,
-		"interval": interval,
-		"easiness": new_easiness,
-		"next_review": next_review,
-	}
+		return {
+			"mistake_id": mistake_id,
+			"repetition": repetition,
+			"interval": interval,
+			"easiness": new_easiness,
+			"next_review": next_review,
+		}
 
 
 def get_user_mistakes(user_id: int, limit: int = 100):
 	"""Kullanicinin tum mistakes kayitlarini dondurur."""
-	conn = get_db_connection()
-	cur = conn.cursor()
-	cur.execute(
-		"SELECT * FROM mistakes WHERE user_id = ? ORDER BY last_seen DESC LIMIT ?",
-		(user_id, limit),
-	)
-	rows = cur.fetchall()
-	conn.close()
-	return [dict(r) for r in rows]
+	with get_db() as conn:
+		cur = conn.cursor()
+		cur.execute(
+			"SELECT * FROM mistakes WHERE user_id = ? ORDER BY last_seen DESC LIMIT ?",
+			(user_id, limit),
+		)
+		rows = cur.fetchall()
+		return [dict(r) for r in rows]
 
 
 if __name__ == "__main__":

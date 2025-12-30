@@ -527,6 +527,7 @@ class CourseSystem:
             
             # XP ekle
             earned_xp = xp_reward * (score / 100)
+
             cursor.execute("""
                 UPDATE user_course_state SET total_xp = total_xp + ?, last_lesson_at = ?
                 WHERE user_id = ?
@@ -864,7 +865,7 @@ class CourseSystem:
                         "question": english,
                         "answer": english,
                         "options": [],
-                        "hint": example if example else f"Örnek: I {english} every day.",
+                        "hint": None,
                         "word_id": word_id
                     }
                 elif lesson_type == "pronunciation":

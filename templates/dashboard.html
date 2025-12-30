@@ -180,10 +180,14 @@ document.addEventListener('DOMContentLoaded', function() {
     fetch('/api/dashboard-stats')
         .then(response => response.json())
         .then(data => {
-            if (data.streak) document.getElementById('streakCount').textContent = data.streak;
-            if (data.today_correct) document.getElementById('todayCorrect').textContent = data.today_correct;
-            if (data.words_learned) document.getElementById('wordsLearned').textContent = data.words_learned;
-            if (data.rank) document.getElementById('userRank').textContent = '#' + data.rank;
+            if (data.streak !== undefined && data.streak !== null)
+                document.getElementById('streakCount').textContent = data.streak;
+            if (data.today_correct !== undefined && data.today_correct !== null)
+                document.getElementById('todayCorrect').textContent = data.today_correct;
+            if (data.words_learned !== undefined && data.words_learned !== null)
+                document.getElementById('wordsLearned').textContent = data.words_learned;
+            if (data.rank !== undefined && data.rank !== null)
+                document.getElementById('userRank').textContent = '#' + data.rank;
         })
         .catch(err => console.log('İstatistik yükleme hatası:', err));
 });

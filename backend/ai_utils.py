@@ -381,24 +381,31 @@ def personalized_feedback(user_stats: dict) -> str:
       "weak_words": ["apple", "orange"]
     }
     """
-    prompt = f"""
-    Kullanıcı istatistikleri:
-    - Doğru kelime oranı: {user_stats.get('correct_word_ratio', 0)*100:.1f}%
-    - Ortalama telaffuz puanı: {user_stats.get('pronunciation_avg', 0):.1f}
-    - Zayıf kelimeler: {", ".join(user_stats.get('weak_words', []))}
+    # Kullanıcıya özel, istatistik odaklı, motive edici ve gelişim alanı vurgulu bir prompt
+    correct_ratio = user_stats.get('correct_word_ratio', 0)
+    pronunciation = user_stats.get('pronunciation_avg', 0)
+    weak_words = user_stats.get('weak_words', [])
+    weak_words_str = ", ".join(weak_words) if weak_words else "-"
 
-    Bu kullanıcıya Türkçe olarak 2–3 cümlelik kişisel geri bildirim yaz.
-    1. Küçük bir motivasyon cümlesi olsun.
-    2. Hangi alana odaklanması gerektiğini söyle (kelime, telaffuz vs.).
-    3. Çok akademik değil, samimi ama öğretici bir dil kullan.
+    prompt = f"""
+    Kullanıcıya kişisel, motive edici ve gelişim odaklı bir geri bildirim yaz:
+    - Doğru cevap oranı: %{correct_ratio*100:.1f}
+    - Ortalama telaffuz puanı: {pronunciation:.1f}
+    - Zayıf kelimeler: {weak_words_str}
+
+    1. Önce kullanıcının mevcut başarısını öv, motivasyon ver.
+    2. Eğer doğru oranı %80'in altındaysa, kelime pratiği öner. %90 üstündeyse tebrik et ve daha zor konulara yönlendir.
+    3. Telaffuz puanı 75'in altındaysa, sesli tekrar ve konuşma pratiği öner.
+    4. Zayıf kelimeler varsa, bunları cümle içinde kullanmasını öner ve örnek bir cümle ver.
+    5. Samimi, motive edici ve kişisel bir dil kullan. Akademik olmasın.
+    6. Son cümlede "Unutma, her gün küçük bir adım bile büyük fark yaratır!" gibi bir kapanış ekle.
     """
     result = _llm_chat(prompt, system="You are a friendly language learning coach.")
     return result
 
 def generate_custom_lesson(topic: str, level: str = "A1-A2") -> str:
     """
-    Kullanıcının istediği konuya göre yapay zekâ ile mini ders üretir.
-    Bu fonksiyon SmartLang'in özgün özelliğidir.
+    Kullanıcının istediği konuya göre yapay zekâ ile zengin, özelleştirilebilir mini ders üretir.
     """
     prompt = f"""
     Kullanıcı İngilizce öğreniyor ve şu konuyu çalışmak istiyor:
@@ -406,12 +413,13 @@ def generate_custom_lesson(topic: str, level: str = "A1-A2") -> str:
 
     Seviye: {level}
 
-    Lütfen:
-    1) Bu konuya uygun 2 kısa ve basit İngilizce örnek cümle yaz
-    2) 1 adet mini alıştırma sorusu oluştur
-    3) Türkçe kısa bir açıklama ekle
+    Lütfen aşağıdaki formatta ve HTML <b> etiketiyle kalınlık kullanarak cevap ver:
+    1) <b>Konu Özeti:</b> (Türkçe, 2-3 cümle, konunun temelini açıkla)
+    2) <b>Örnek Cümleler:</b> (2 kısa ve basit İngilizce cümle, Türkçe anlamlarıyla birlikte)
+    3) <b>Mini Alıştırma:</b> (1 adet boşluk doldurma veya çoktan seçmeli soru, cevap şıkkı ve doğru cevabı belirt)
+    4) <b>Ekstra İpucu:</b> (Konuya dair kısa bir pratik öneri veya püf noktası)
 
-    Cevabı sade, öğretici ve A1–A2 seviyesine uygun yaz.
+    Cevabı sade, öğretici ve A1–A2 seviyesine uygun yaz. Sadece HTML <b> etiketiyle kalınlık kullan, markdown veya başka işaretleme kullanma.
     """
 
     return _llm_chat(prompt, system="You are a friendly English teacher.")

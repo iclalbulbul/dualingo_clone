@@ -2,7 +2,7 @@ from flask import Flask, render_template, request, redirect, url_for, session, j
 from backend.rules import analyze_sentence
 from backend.ai_utils import grammar_feedback_json, pronunciation_feedback, generate_sentence, personalized_feedback, generate_custom_lesson, mistake_feedback
 from backend.speech_stt import recognize_from_audio_file, recognize_from_blob
-from db_utils import get_db_connection, get_user_id, create_or_get_user, update_review_result, record_mistake, register_user, login_user, get_user_mistakes
+from db_utils import get_db_connection, get_db, get_user_id, create_or_get_user, update_review_result, record_mistake, register_user, login_user, get_user_mistakes
 from backend.recommender import get_review_quiz
 from translation_utils import get_translation, check_answer
 from user_db import UserInputLogger
@@ -223,38 +223,51 @@ def practice_word():
     
     user_id = session.get("user_id")
     
-    # Database'den random bir kelime al
-    conn = get_db_connection()
-    cursor = conn.cursor()
-    
     # GET: başlat, POST: kontrol et
     current_word = None
     result = None
     
     if request.method == "GET":
-        # A1 seviye dari random bir kelime seç
-        cursor.execute("SELECT word_id, english, topic_id FROM words WHERE level='A1' ORDER BY RANDOM() LIMIT 1")
-        word_row = cursor.fetchone()
-        
-        if word_row:
-            current_word = {
-                "word_id": word_row[0],
-                "english": word_row[1],
-                "topic_id": word_row[2]
-            }
+        # Database'den random bir kelime al
+        with get_db() as conn:
+            cursor = conn.cursor()
+            # Kullanıcının seviyesini al
+            user_level = None
+            if user_id:
+                cursor.execute("SELECT level FROM users WHERE user_id = ?", (user_id,))
+                level_row = cursor.fetchone()
+                if level_row:
+                    user_level = level_row[0]
+            # Seviyeye göre random kelime seç
+            if user_level:
+                cursor.execute("SELECT word_id, english, topic_id FROM words WHERE level = ? ORDER BY RANDOM() LIMIT 1", (user_level,))
+            else:
+                cursor.execute("SELECT word_id, english, topic_id FROM words ORDER BY RANDOM() LIMIT 1")
+            word_row = cursor.fetchone()
+            
+            if word_row:
+                current_word = {
+                    "word_id": word_row[0],
+                    "english": word_row[1],
+                    "topic_id": word_row[2]
+                }
     
     elif request.method == "POST":
         word_id = request.form.get("word_id")
         user_answer = request.form.get("answer", "").strip()
+        english_word = None
         
         # Kelimeyi database'den al
         if word_id:
-            cursor.execute("SELECT english, turkish FROM words WHERE word_id = ?", (word_id,))
-            word_row = cursor.fetchone()
-            
-            if word_row:
-                english_word = word_row[0]
+            with get_db() as conn:
+                cursor = conn.cursor()
+                cursor.execute("SELECT english, turkish FROM words WHERE word_id = ?", (word_id,))
+                word_row = cursor.fetchone()
                 
+                if word_row:
+                    english_word = word_row[0]
+            
+            if english_word:
                 # Çeviri al (önce DB cache, yoksa API)
                 try:
                     api_translation = get_translation(english_word)
@@ -295,13 +308,21 @@ def practice_word():
                 
                 # Sonucu veritabanına kaydet
                 if user_id and result:
-                    cursor.execute("""
-                        INSERT INTO practice_history (user_id, practice_type, word_id, is_correct, attempted_answer)
-                        VALUES (?, ?, ?, ?, ?)
-                    """, (user_id, "word_practice", word_id, 1 if result["is_correct"] else 0, user_answer))
-                    conn.commit()
-                    
-                    # UserInputLogger ile çeviri denemesini kaydet
+                    with get_db() as conn:
+                        cursor = conn.cursor()
+                        cursor.execute("""
+                            INSERT INTO practice_history (user_id, practice_type, word_id, is_correct, attempted_answer)
+                            VALUES (?, ?, ?, ?, ?)
+                        """, (user_id, "word_practice", word_id, 1 if result["is_correct"] else 0, user_answer))
+
+                    # Merkezi puanlama sistemi ile puan ekle
+                    from features.points_manager import PointsManager
+                    if result["is_correct"]:
+                        PointsManager.add_points(user_id, 'correct_answer')
+                    else:
+                        PointsManager.add_points(user_id, 'wrong_answer')
+
+                    # UserInputLogger ile çeviri denemesini kaydet (ayrı bağlantı kullanır)
                     logger.log_translation_attempt(
                         user_id=user_id,
                         english_word=english_word,
@@ -312,8 +333,9 @@ def practice_word():
                         word_id=int(word_id),
                         attempt_number=1
                     )
-                    
+
                     # Genel giriş logu
+                    print(f"[DEBUG] log_user_input çağrısı: user_id={user_id}, input_type='word_translation', input_text={user_answer}, response_text={result['correct_answer']}, is_correct={result['is_correct']}, score={result['similarity']*100}, word_id={int(word_id) if result['is_correct'] else None}, metadata={{'english': english_word, 'feedback': result['feedback']}}")
                     logger.log_user_input(
                         user_id=user_id,
                         input_type='word_translation',
@@ -321,10 +343,10 @@ def practice_word():
                         response_text=result["correct_answer"],
                         is_correct=result["is_correct"],
                         score=result["similarity"] * 100,
-                        word_id=int(word_id),
+                        word_id=int(word_id) if result["is_correct"] else None,
                         metadata={'english': english_word, 'feedback': result["feedback"]}
                     )
-                    
+
                     # Hedef ilerlemesini senkronize et
                     goal_manager.sync_goal_progress(user_id)
 
@@ -343,17 +365,17 @@ def practice_word():
                         pass
         
         # Sonra yeni bir kelime göster
-        cursor.execute("SELECT word_id, english, topic_id FROM words WHERE level='A1' ORDER BY RANDOM() LIMIT 1")
-        word_row = cursor.fetchone()
-        
-        if word_row:
-            current_word = {
-                "word_id": word_row[0],
-                "english": word_row[1],
-                "topic_id": word_row[2]
-            }
-    
-    conn.close()
+        with get_db() as conn:
+            cursor = conn.cursor()
+            cursor.execute("SELECT word_id, english, topic_id FROM words WHERE level='A1' ORDER BY RANDOM() LIMIT 1")
+            word_row = cursor.fetchone()
+            
+            if word_row:
+                current_word = {
+                    "word_id": word_row[0],
+                    "english": word_row[1],
+                    "topic_id": word_row[2]
+                }
     
     return render_template(
         "practice_word.html",
@@ -381,11 +403,10 @@ def practice_sentence():
     # GET isteğinde örnek kelime ve cümle oluştur
     if request.method == "GET":
         # Rastgele bir kelime seç
-        conn = get_db_connection()
-        cursor = conn.cursor()
-        cursor.execute("SELECT english FROM words WHERE level='A1' ORDER BY RANDOM() LIMIT 1")
-        word_row = cursor.fetchone()
-        conn.close()
+        with get_db() as conn:
+            cursor = conn.cursor()
+            cursor.execute("SELECT english FROM words WHERE level='A1' ORDER BY RANDOM() LIMIT 1")
+            word_row = cursor.fetchone()
         
         if word_row:
             target_word = word_row[0]
@@ -472,28 +493,27 @@ def practice_sentence():
             }
             
             # Veritabanında hataları kaydet
-            conn = None
             try:
-                conn = get_db_connection()
-                cursor = conn.cursor()
-                
-                if user_id and analysis_result["errors"]:
-                    timestamp = datetime.now().isoformat()
+                with get_db() as conn:
+                    cursor = conn.cursor()
                     
-                    for error in analysis_result["errors"]:
-                        cursor.execute("""
-                            INSERT INTO grammar_errors (user_id, sentence, error_type, error_message, score, timestamp)
-                            VALUES (?, ?, ?, ?, ?, ?)
-                        """, (
-                            user_id,
-                            user_sentence,
-                            error.get("rule"),
-                            error.get("message_tr", ""),
-                            analysis_result["score"],
-                            timestamp
-                        ))
+                    if user_id and analysis_result["errors"]:
+                        timestamp = datetime.now().isoformat()
+                        
+                        for error in analysis_result["errors"]:
+                            cursor.execute("""
+                                INSERT INTO grammar_errors (user_id, sentence, error_type, error_message, score, timestamp)
+                                VALUES (?, ?, ?, ?, ?, ?)
+                            """, (
+                                user_id,
+                                user_sentence,
+                                error.get("rule"),
+                                error.get("message_tr", ""),
+                                analysis_result["score"],
+                                timestamp
+                            ))
                 
-                # UserInputLogger ile cümle analiz girdisini kaydet
+                # UserInputLogger ile cümle analiz girdisini kaydet (ayrı bağlantı)
                 if user_id:
                     logger.log_user_input(
                         user_id=user_id,
@@ -522,17 +542,8 @@ def practice_sentence():
                     # Hedef ilerlemesini senkronize et
                     goal_manager.sync_goal_progress(user_id)
                 
-                conn.commit()
-                
             except Exception as e:
                 print(f"❌ DB logging hatası: {e}")
-            finally:
-                # Database bağlantısını her durumda kapat
-                if conn:
-                    try:
-                        conn.close()
-                    except:
-                        pass
             
             # Eğer kurallar veya LLM kontrolünde hata varsa, mistakes tablosuna ekle
             try:
@@ -675,11 +686,10 @@ def pronunciation():
     
     else:
         # GET isteğinde yeni rastgele kelime al
-        conn = get_db_connection()
-        cursor = conn.cursor()
-        cursor.execute("SELECT word_id, english FROM words WHERE level IN ('A1', 'A2') ORDER BY RANDOM() LIMIT 1")
-        word_row = cursor.fetchone()
-        conn.close()
+        with get_db() as conn:
+            cursor = conn.cursor()
+            cursor.execute("SELECT word_id, english FROM words WHERE level IN ('A1', 'A2') ORDER BY RANDOM() LIMIT 1")
+            word_row = cursor.fetchone()
         
         if word_row:
             word_id = word_row[0]
@@ -1610,7 +1620,10 @@ def learn():
     
     # Kurs haritasını al
     course_map = course_system.get_user_course_map(user_id)
-    
+
+    # Gerçek streak bilgisini ekle (günlük girişe göre)
+    course_map["streak"] = stats_manager._calculate_streak(user_id)
+
     return render_template("learn.html",
                           username=username,
                           course_map=course_map)

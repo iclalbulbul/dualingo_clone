@@ -294,12 +294,14 @@ class UserStats:
         """
         Tüm zamanın istatistiklerini döndür.
         """
+        # Her çağrıda yeni bağlantı açılır, zincirleme bağlantı olmaz
         return self.logger.get_user_statistics(user_id)
-    
+
     def get_word_stats(self, user_id: int) -> Dict[str, Any]:
         """
         Kelime performans istatistikleri.
         """
+        # Her çağrıda yeni bağlantı açılır, zincirleme bağlantı olmaz
         return self.logger.get_word_performance(user_id)
     
     def get_user_recent_inputs(self, user_id: int, limit: int = 10) -> List[Dict[str, Any]]:
